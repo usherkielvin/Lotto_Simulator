@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Animated,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -50,6 +50,9 @@ type Palette = {
   cardBg: string;
   cardBorder: string;
   heroBg: string;
+  heroText: string;
+  heroTextSoft: string;
+  heroStageBg: string;
   textStrong: string;
   textSoft: string;
   accent: string;
@@ -312,6 +315,9 @@ export default function HomeScreen() {
           cardBg: '#0f2344',
           cardBorder: '#23477e',
           heroBg: '#0d3a78',
+          heroText: '#edf4ff',
+          heroTextSoft: '#a9c2e6',
+          heroStageBg: '#0a1b35',
           textStrong: '#edf4ff',
           textSoft: '#a9c2e6',
           accent: '#f4b400',
@@ -340,6 +346,9 @@ export default function HomeScreen() {
           cardBg: '#ffffff',
           cardBorder: '#cadbf5',
           heroBg: '#0f4ea9',
+          heroText: '#ffffff',
+          heroTextSoft: 'rgba(255,255,255,0.72)',
+          heroStageBg: 'rgba(255,255,255,0.15)',
           textStrong: '#15305e',
           textSoft: '#5a7299',
           accent: '#f4b400',
@@ -485,32 +494,25 @@ export default function HomeScreen() {
         <View style={[styles.heroCard, { backgroundColor: palette.heroBg }]}> 
           <View style={styles.heroRow}>
             <View>
-              <Text style={[styles.heroTag, { color: palette.textSoft }]}>PCSO LOTTO SIMULATOR</Text>
-              <Text style={[styles.heroTitle, { color: palette.textStrong }]}>{displayName}</Text>
-              <Text style={[styles.heroSubTitle, { color: palette.textSoft }]}>Daily 9:00 PM draw tracking</Text>
+              <Text style={[styles.heroTag, { color: 'rgba(255,255,255,0.70)' }]}>PCSO LOTTO SIMULATOR</Text>
+              <Text style={[styles.heroTitle, { color: '#ffffff' }]}>{displayName}</Text>
+              <Text style={[styles.heroSubTitle, { color: 'rgba(255,255,255,0.70)' }]}>Daily 9:00 PM draw tracking</Text>
             </View>
-
-            <Pressable
-              onPress={() => router.replace('/')}
-              style={[styles.logoutButton, { backgroundColor: palette.secondaryButton }]}>
-              <Ionicons name="exit-outline" size={15} color={palette.secondaryButtonText} />
-              <Text style={[styles.logoutText, { color: palette.secondaryButtonText }]}>Logout</Text>
-            </Pressable>
           </View>
 
           <View style={styles.heroStatsRow}>
-            <View style={[styles.heroStat, { backgroundColor: palette.stageBg }]}> 
-              <Text style={[styles.heroStatLabel, { color: palette.textSoft }]}>Demo Balance</Text>
+            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+              <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.70)' }]}>Demo Balance</Text>
               <Text style={[styles.heroStatValue, { color: palette.accent }]}>{formatCurrency(balance)}</Text>
             </View>
-            <View style={[styles.heroStat, { backgroundColor: palette.stageBg }]}> 
-              <Text style={[styles.heroStatLabel, { color: palette.textSoft }]}>Next Draw</Text>
+            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+              <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.70)' }]}>Next Draw</Text>
               <Text style={[styles.heroStatValue, { color: palette.accent }]}>{countdownLabel}</Text>
             </View>
           </View>
 
-          <Text style={[styles.drawMeta, { color: palette.textSoft }]}>Draw lock: {nextDrawLabel}</Text>
-          <Text style={[styles.drawSource, { color: palette.textSoft }]}>Result basis: official 9:00 PM schedule in demo mode.</Text>
+          <Text style={[styles.drawMeta,   { color: 'rgba(255,255,255,0.70)' }]}>Draw lock: {nextDrawLabel}</Text>
+          <Text style={[styles.drawSource, { color: 'rgba(255,255,255,0.70)' }]}>Result basis: official 9:00 PM schedule in demo mode.</Text>
 
           {isDemoUser ? (
             <View style={[styles.demoBadge, { backgroundColor: palette.accent }]}>

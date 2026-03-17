@@ -1,171 +1,139 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { LiquidGlassCard } from '@/components/liquid-glass-card';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Fonts } from '@/constants/theme';
+import { usePalette } from '@/hooks/use-palette';
 
 const STATS = [
-  { icon: '🎰', label: 'Total Plays',  value: '47'   },
-  { icon: '🏆', label: 'Prizes Won',   value: '9'    },
-  { icon: '⭐', label: 'Best Match',   value: '4 / 6' },
-  { icon: '📊', label: 'Win Rate',     value: '19 %'  },
+  { icon: '🎰', label: 'Total Plays', value: '47'    },
+  { icon: '🏆', label: 'Prizes Won',  value: '9'     },
+  { icon: '⭐', label: 'Best Match',  value: '4 / 6' },
+  { icon: '📊', label: 'Win Rate',    value: '19%'   },
 ];
 
 const LUCKY_NUMBERS = [7, 14, 22, 33, 40, 49];
 
-const SETTINGS = [
-  { icon: '🔔', label: 'Draw notifications' },
-  { icon: '🌊', label: 'Liquid glass effects' },
-  { icon: '🎨', label: 'App theme' },
-  { icon: '❓', label: 'Help & support' },
-  { icon: '🔐', label: 'Privacy & data' },
+const SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
+  { icon: 'notifications-outline', label: 'Draw notifications' },
+  { icon: 'color-palette-outline', label: 'App theme'          },
+  { icon: 'help-circle-outline',   label: 'Help & support'     },
+  { icon: 'lock-closed-outline',   label: 'Privacy & data'     },
 ];
 
-function LuckyBall({ n, tint }: { n: number; tint: string }) {
-  return (
-    <View style={[styles.luckyBall, { borderColor: tint }]}>
-      <Text style={[styles.luckyBallText, { color: tint }]}>{n}</Text>
-    </View>
-  );
-}
-
 export default function ProfileScreen() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const tint = Colors[colorScheme ?? 'light'].tint;
+  const p = usePalette();
+  const router = useRouter();
 
   return (
-    <ThemedView style={styles.root}>
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Avatar */}
-        <View style={styles.avatarSection}>
-          <View style={[styles.avatar, { backgroundColor: tint }]}>
-            <Text style={styles.avatarInitial}>U</Text>
-          </View>
-          <ThemedText type="title" style={styles.name}>Player One</ThemedText>
-          <ThemedText style={styles.memberSince}>Member since Jan 2026</ThemedText>
-        </View>
+    <SafeAreaView style={[s.root, { backgroundColor: p.screenBg }]}>
+      {/* Orbs */}
+      <View style={[s.orbTop,    { backgroundColor: p.orbOne }]} />
+      <View style={[s.orbBottom, { backgroundColor: p.orbTwo }]} />
 
-        {/* Stats grid */}
-        <View style={styles.statsGrid}>
-          {STATS.map(({ icon, label, value }) => (
-            <LiquidGlassCard
-              key={label}
-              style={styles.statCard}
-              effect="regular"
-              borderRadius={20}
-            >
-              <Text style={styles.statIcon}>{icon}</Text>
-              <Text style={[styles.statValue, { color: tint }]}>{value}</Text>
-              <ThemedText style={styles.statLabel}>{label}</ThemedText>
-            </LiquidGlassCard>
-          ))}
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* Hero / avatar */}
+        <View style={[s.hero, { backgroundColor: p.heroBg }]}>
+          <Text style={[s.heroTag, { color: 'rgba(255,255,255,0.70)' }]}>PCSO LOTTO SIMULATOR</Text>
+          <View style={s.avatarRow}>
+            <View style={[s.avatar, { backgroundColor: p.accent }]}>
+              <Text style={[s.avatarInitial, { color: p.accentText }]}>P</Text>
+            </View>
+            <View>
+              <Text style={[s.playerName, { color: '#ffffff' }]}>Player One</Text>
+              <Text style={[s.memberSince, { color: 'rgba(255,255,255,0.70)' }]}>Member since Jan 2026</Text>
+            </View>
+          </View>
+
+          {/* Stats row */}
+          <View style={s.statsRow}>
+            {STATS.map(({ icon, label, value }) => (
+              <View key={label} style={[s.stat, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+                <Text style={s.statIcon}>{icon}</Text>
+                <Text style={[s.statValue, { color: p.accent }]}>{value}</Text>
+                <Text style={[s.statLabel, { color: 'rgba(255,255,255,0.70)' }]}>{label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Lucky numbers */}
-        <LiquidGlassCard style={styles.section} effect="clear" borderRadius={22}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Your Lucky Numbers</ThemedText>
-          <View style={styles.luckyRow}>
+        <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
+          <Text style={[s.sectionTitle, { color: p.textStrong }]}>Your Lucky Numbers</Text>
+          <View style={s.luckyRow}>
             {LUCKY_NUMBERS.map((n) => (
-              <LuckyBall key={n} n={n} tint={tint} />
+              <View key={n} style={[s.luckyBall, { backgroundColor: p.secondaryButton }]}>
+                <Text style={[s.luckyBallText, { color: p.secondaryButtonText }]}>{n}</Text>
+              </View>
             ))}
           </View>
-        </LiquidGlassCard>
+        </View>
 
         {/* Settings */}
-        <ThemedText type="subtitle" style={styles.sectionHeader}>Settings</ThemedText>
-        <LiquidGlassCard style={styles.settingsCard} effect="clear" borderRadius={22}>
-          {SETTINGS.map(({ icon, label }, index) => (
+        <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
+          <Text style={[s.sectionTitle, { color: p.textStrong }]}>Settings</Text>
+          {SETTINGS.map(({ icon, label }, i) => (
             <View key={label}>
-              <View style={styles.settingsRow}>
-                <Text style={styles.settingsIcon}>{icon}</Text>
-                <ThemedText style={styles.settingsLabel}>{label}</ThemedText>
-                <Text style={[styles.chevron, { color: isDark ? '#6B7280' : '#9CA3AF' }]}>›</Text>
-              </View>
-              {index < SETTINGS.length - 1 && (
-                <View style={styles.divider} />
+              <Pressable style={s.settingsRow}>
+                <View style={[s.settingsIconWrap, { backgroundColor: p.chipIdle }]}>
+                  <Ionicons name={icon} size={16} color={p.chipIdleText} />
+                </View>
+                <Text style={[s.settingsLabel, { color: p.textStrong }]}>{label}</Text>
+                <Ionicons name="chevron-forward" size={16} color={p.textSoft} />
+              </Pressable>
+              {i < SETTINGS.length - 1 && (
+                <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
               )}
             </View>
           ))}
-        </LiquidGlassCard>
+          <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
+          <Pressable style={s.settingsRow} onPress={() => router.replace('/')}>
+            <View style={[s.settingsIconWrap, { backgroundColor: '#fee2e2' }]}>
+              <Ionicons name="exit-outline" size={16} color="#dc2626" />
+            </View>
+            <Text style={[s.settingsLabel, { color: '#dc2626' }]}>Logout</Text>
+            <Ionicons name="chevron-forward" size={16} color="#dc2626" />
+          </Pressable>
+        </View>
 
-        {/* Bottom spacer for floating tab bar */}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 110 }} />
       </ScrollView>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   root: { flex: 1 },
-  scroll: { padding: 20, paddingTop: 64 },
+  orbTop:    { position: 'absolute', width: 280, height: 280, borderRadius: 140, top: -80,   right: -85,   opacity: 0.55 },
+  orbBottom: { position: 'absolute', width: 320, height: 320, borderRadius: 160, left: -130, bottom: -130, opacity: 0.42 },
+  scroll: { padding: 16, gap: 14 },
 
-  avatarSection: { alignItems: 'center', marginBottom: 32 },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  avatarInitial: { color: '#fff', fontSize: 34, fontWeight: '800' },
-  name: { fontSize: 24, fontWeight: '800', marginBottom: 4 },
-  memberSince: { fontSize: 13, opacity: 0.5 },
+  hero:    { borderRadius: 18, padding: 16 },
+  heroTag: { fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', fontFamily: Fonts.mono, marginBottom: 14 },
 
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  statCard: {
-    width: '47%',
-    alignItems: 'center',
-    paddingVertical: 18,
-  },
-  statIcon: { fontSize: 22, marginBottom: 6 },
-  statValue: { fontSize: 20, fontWeight: '800', marginBottom: 2 },
-  statLabel: { fontSize: 12, opacity: 0.6 },
+  avatarRow:     { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  avatar:        { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { fontSize: 26, fontWeight: '800', fontFamily: Fonts.rounded },
+  playerName:    { fontSize: 20, fontWeight: '800', fontFamily: Fonts.rounded },
+  memberSince:   { fontSize: 12, fontWeight: '500', marginTop: 2, fontFamily: Fonts.sans },
 
-  section: { marginBottom: 20 },
-  sectionTitle: { marginBottom: 14 },
-  luckyRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  luckyBall: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(22,163,74,0.08)',
-  },
-  luckyBallText: { fontSize: 14, fontWeight: '800' },
+  statsRow: { flexDirection: 'row', gap: 8 },
+  stat:     { flex: 1, borderRadius: 12, padding: 10, alignItems: 'center' },
+  statIcon: { fontSize: 18, marginBottom: 4 },
+  statValue:{ fontSize: 15, fontWeight: '800', fontFamily: Fonts.rounded },
+  statLabel:{ fontSize: 10, fontWeight: '600', marginTop: 2, fontFamily: Fonts.sans },
 
-  sectionHeader: { marginBottom: 10, opacity: 0.7 },
-  settingsCard: { marginBottom: 20, paddingVertical: 4 },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
-  settingsIcon: { fontSize: 18, width: 32 },
-  settingsLabel: { flex: 1, fontSize: 15 },
-  chevron: { fontSize: 22, fontWeight: '300' },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(156,163,175,0.2)',
-    marginLeft: 32,
-  },
+  card:         { borderRadius: 16, borderWidth: 1, padding: 14 },
+  sectionTitle: { fontSize: 16, fontWeight: '800', fontFamily: Fonts.rounded, marginBottom: 14 },
+
+  luckyRow:     { flexDirection: 'row', justifyContent: 'space-between' },
+  luckyBall:    { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  luckyBallText:{ fontSize: 13, fontWeight: '700', fontFamily: Fonts.mono },
+
+  settingsRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
+  settingsIconWrap:{ width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  settingsLabel:   { flex: 1, fontSize: 14, fontWeight: '600', fontFamily: Fonts.sans },
+  divider:         { height: StyleSheet.hairlineWidth, marginLeft: 44 },
 });

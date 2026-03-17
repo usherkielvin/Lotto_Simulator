@@ -7,12 +7,12 @@ import {
     KeyboardAvoidingView,
     Platform,
     Pressable,
-    SafeAreaView,
     StyleSheet,
     Text,
     TextInput,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -136,7 +136,7 @@ export default function LoginScreen() {
 
   const enterHome = (name: string, isDemo: boolean) => {
     router.replace({
-      pathname: '/home',
+      pathname: '/(tabs)/',
       params: {
         user: name,
         demo: isDemo ? '1' : '0',

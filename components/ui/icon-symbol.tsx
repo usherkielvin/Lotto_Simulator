@@ -20,7 +20,7 @@ const MAPPING = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
-  'ticket.fill': 'confirmation-number',
+  'ticket.fill': 'casino',
   'trophy.fill': 'emoji-events',
   'star.fill': 'star',
   'gearshape.fill': 'settings',

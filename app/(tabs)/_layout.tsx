@@ -1,59 +1,65 @@
-import { Tabs, useRouter, useSegments } from 'expo-router';
+import { Tabs } from 'expo-router';
 import React from 'react';
 
-import { GlassTabBar, TabItem } from '@/components/glass-tab-bar';
-import { HapticTab } from '@/components/haptic-tab';
+import { LiquidTabBar } from '@/components/liquid-tab-bar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-const TABS: TabItem[] = [
-  {
-    key: 'index',
-    label: 'Home',
-    icon: (color) => <IconSymbol size={22} name="house.fill" color={color} />,
-  },
-  {
-    key: 'explore',
-    label: 'Explore',
-    icon: (color) => <IconSymbol size={22} name="paperplane.fill" color={color} />,
-  },
-];
-
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const segments = useSegments();
-  const router = useRouter();
-
-  // Derive active index from current route segment
-  const activeIndex = TABS.findIndex((t) => segments.includes(t.key as never));
-  const safeIndex = activeIndex < 0 ? 0 : activeIndex;
-
-  const handleTabPress = (index: number) => {
-    const routes = ['/(tabs)/', '/(tabs)/explore'] as const;
-    router.push(routes[index] as any);
-  };
 
   return (
     <Tabs
+      tabBar={(props) => <LiquidTabBar {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarStyle: { display: 'none' }, // hide default bar; we render our own
+        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarStyle: {
+          position: 'absolute',
+          backgroundColor: 'transparent',
+          borderTopWidth: 0,
+          elevation: 0,
+        },
+        tabBarBackground: () => null,
       }}
-      tabBar={() => (
-        <GlassTabBar
-          tabs={TABS}
-          activeIndex={safeIndex}
-          onTabPress={handleTabPress}
-        />
-      )}
     >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="explore" />
-      <Tabs.Screen name="history" />
-      <Tabs.Screen name="profile" />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="house.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="tickets"
+        options={{
+          title: 'Tickets',
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="ticket.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'History',
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="clock.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="person.fill" color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
