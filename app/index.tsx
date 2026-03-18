@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Fonts } from '@/constants/theme';
 import { apiFetch } from '@/hooks/use-api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSession } from '@/hooks/use-session';
 
 type AuthPalette = {
   page: string;
@@ -109,10 +110,13 @@ type SessionResult = {
 export default function LoginScreen() {
   const router = useRouter();
   const scheme = useColorScheme();
+  const { signIn } = useSession();
   const isWeb = Platform.OS === 'web';
   const [useWebDark, setUseWebDark] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -140,15 +144,14 @@ export default function LoginScreen() {
   const isDark = isWeb ? useWebDark : scheme === 'dark';
   const palette = isDark ? darkPalette : lightPalette;
 
-  const enterHome = (session: SessionResult) => {
-    router.replace({
-      pathname: '/(tabs)',
-      params: {
-        user: session.displayName,
-        userId: String(session.userId),
-        demo: session.demo ? '1' : '0',
-      },
+  const enterHome = async (session: SessionResult) => {
+    await signIn({
+      userId: session.userId,
+      username: session.username,
+      displayName: session.displayName,
+      demo: session.demo,
     });
+    router.replace('/(tabs)');
   };
 
   const onLogin = async () => {
@@ -179,14 +182,34 @@ export default function LoginScreen() {
     }
   };
 
-  const onDemoLogin = async () => {
+  const onSignup = async () => {
+    const cleanUsername = username.trim();
+    const cleanPassword = password.trim();
+    const cleanDisplayName = displayName.trim();
+
+    if (!cleanUsername || !cleanPassword) {
+      setError('Username and password are required.');
+      return;
+    }
+    if (cleanPassword.length < 4) {
+      setError('Password must be at least 4 characters.');
+      return;
+    }
+    if (!cleanDisplayName) {
+      setError('Display name is required.');
+      return;
+    }
+
     setError('');
     setLoading(true);
     try {
-      const session = await apiFetch<SessionResult>('/auth/demo', { method: 'POST' });
+      const session = await apiFetch<SessionResult>('/auth/register', {
+        method: 'POST',
+        body: { username: cleanUsername, password: cleanPassword, displayName: cleanDisplayName },
+      });
       enterHome(session);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Demo login failed.');
+      setError(e instanceof Error ? e.message : 'Signup failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -263,6 +286,8 @@ export default function LoginScreen() {
             { backgroundColor: palette.card, borderColor: palette.cardBorder },
             cardAnimatedStyle,
           ]}>
+          <Text style={[styles.cardTitle, { color: palette.label }]}>{isSignup ? 'Create Account' : 'Welcome Back'}</Text>
+
           <Text style={[styles.inputLabel, { color: palette.label }]}>Username</Text>
           <TextInput
             value={username}
@@ -281,6 +306,28 @@ export default function LoginScreen() {
               },
             ]}
           />
+
+          {isSignup && (
+            <>
+              <Text style={[styles.inputLabel, styles.passwordLabel, { color: palette.label }]}>Display Name</Text>
+              <TextInput
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder="Enter display name"
+                placeholderTextColor={palette.placeholder}
+                autoCapitalize="words"
+                textContentType="name"
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: palette.inputBg,
+                    borderColor: palette.inputBorder,
+                    color: palette.inputText,
+                  },
+                ]}
+              />
+            </>
+          )}
 
           <Text style={[styles.inputLabel, styles.passwordLabel, { color: palette.label }]}>Password</Text>
           <TextInput
@@ -304,23 +351,28 @@ export default function LoginScreen() {
 
           <Pressable
             style={[styles.loginButton, { backgroundColor: palette.primaryButton, opacity: loading ? 0.7 : 1 }]}
-            onPress={onLogin}
+            onPress={isSignup ? onSignup : onLogin}
             disabled={loading}>
             <Text style={[styles.loginLabel, { color: palette.primaryButtonText }]}>
-              {loading ? 'Signing in…' : 'Login Account'}
+              {loading ? (isSignup ? 'Creating…' : 'Signing in…') : (isSignup ? 'Create Account' : 'Login')}
             </Text>
             <Ionicons name="arrow-forward" size={16} color={palette.buttonIcon} />
           </Pressable>
 
           <Pressable
-            style={[styles.demoButton, { backgroundColor: palette.secondaryButton, opacity: loading ? 0.7 : 1 }]}
-            onPress={onDemoLogin}
-            disabled={loading}>
-            <Ionicons name="flash-outline" size={15} color={palette.secondaryButtonText} />
-            <Text style={[styles.demoLabel, { color: palette.secondaryButtonText }]}>Use Demo Account</Text>
+            style={styles.toggleMode}
+            onPress={() => {
+              setIsSignup(!isSignup);
+              setError('');
+              setDisplayName('');
+            }}>
+            <Text style={[styles.toggleModeText, { color: palette.helper }]}>
+              {isSignup ? 'Already have an account? ' : "Don't have an account? "}
+              <Text style={[styles.toggleModeLink, { color: palette.secondaryButton }]}>
+                {isSignup ? 'Login' : 'Sign up'}
+              </Text>
+            </Text>
           </Pressable>
-
-          <Text style={[styles.helperText, { color: palette.helper }]}>Demo login: demo-player / pcso2026</Text>
         </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -342,13 +394,14 @@ const styles = StyleSheet.create({
   toggleButton: { marginTop: 12, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   toggleLabel:  { fontSize: 12, fontWeight: '700', fontFamily: Fonts.sans },
   card:         { borderRadius: 22, borderWidth: 1, padding: 18, shadowColor: '#001d4c', shadowOpacity: 0.14, shadowRadius: 15, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
+  cardTitle:    { fontSize: 18, fontWeight: '800', fontFamily: Fonts.rounded, marginBottom: 14 },
   inputLabel:   { fontSize: 13, fontWeight: '700', fontFamily: Fonts.mono },
   passwordLabel:{ marginTop: 14 },
   input:        { marginTop: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, fontSize: 15, fontFamily: Fonts.sans },
   errorText:    { marginTop: 12, fontSize: 13, fontWeight: '600', fontFamily: Fonts.sans },
   loginButton:  { marginTop: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingVertical: 13 },
   loginLabel:   { fontSize: 16, fontWeight: '800', fontFamily: Fonts.rounded },
-  demoButton:   { marginTop: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, paddingVertical: 12 },
-  demoLabel:    { fontSize: 14, fontWeight: '700', fontFamily: Fonts.sans },
-  helperText:   { marginTop: 12, fontSize: 12, fontWeight: '500', lineHeight: 18, fontFamily: Fonts.sans },
+  toggleMode:   { marginTop: 14, alignItems: 'center' },
+  toggleModeText: { fontSize: 13, fontWeight: '500', fontFamily: Fonts.sans },
+  toggleModeLink: { fontWeight: '700' },
 });

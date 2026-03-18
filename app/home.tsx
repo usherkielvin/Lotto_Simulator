@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -13,8 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { apiFetch } from '@/hooks/use-api';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSession } from '@/hooks/use-session';
 
 type BetMode = 'manual' | 'lucky';
 
@@ -83,9 +84,11 @@ const MAX_STAKE = 500;
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user, userId, demo } = useLocalSearchParams<{ user?: string; userId?: string; demo?: string }>();
+  const { session } = useSession();
   const colorScheme = useColorScheme();
-  const uid = userId ? Number(userId) : null;
+  const uid = session?.userId ?? null;
+  const displayName = session?.displayName ?? 'Player';
+  const isDemoUser = session?.demo ?? false;
 
   // Games from API
   const [games, setGames] = useState<LottoGame[]>([]);
@@ -150,9 +153,6 @@ export default function HomeScreen() {
   const latestSettledDrawKey = toLocalDateKey(latestSettledDrawAt);
   const latestOfficialNumbers = selectedGame ? buildOfficialNumbers(selectedGame, latestSettledDrawKey) : [];
   const countdownLabel = getCountdownLabel(nextDrawAt, now);
-
-  const displayName = user?.toString().trim() || 'Demo Player';
-  const isDemoUser = demo === '1';
   const selectedBallSet = new Set(selectedNumbers);
 
   const palette: Palette = colorScheme === 'dark'
@@ -162,7 +162,7 @@ export default function HomeScreen() {
         textStrong: '#edf4ff', textSoft: '#a9c2e6', accent: '#f4b400', accentText: '#2e2604',
         secondaryButton: '#1a63c2', secondaryButtonText: '#ecf4ff',
         chipIdle: '#14315f', chipIdleText: '#bdd2ef', chipActive: '#f4b400', chipActiveText: '#2f2706',
-        numberIdle: '#143160', numberIdleText: '#c8daef', numberSelected: '#f4b400', numberSelectedText: '#2f2606',
+        numberIdle: '#1e4a8a', numberIdleText: '#e0ebff', numberSelected: '#f4b400', numberSelectedText: '#2f2606',
         ticketPending: '#0e4b9b', ticketWon: '#0f8455', ticketLost: '#8d2f3e',
         orbOne: '#0e2d5d', orbTwo: '#123c73', stageBg: '#0a1b35', payout: '#84e4b7', warning: '#ffb670',
       }
@@ -172,7 +172,7 @@ export default function HomeScreen() {
         textStrong: '#15305e', textSoft: '#5a7299', accent: '#f4b400', accentText: '#342906',
         secondaryButton: '#1260c4', secondaryButtonText: '#eff5ff',
         chipIdle: '#e3edfd', chipIdleText: '#335d92', chipActive: '#f4b400', chipActiveText: '#332905',
-        numberIdle: '#e7effd', numberIdleText: '#2f578c', numberSelected: '#f4b400', numberSelectedText: '#342906',
+        numberIdle: '#d6e5ff', numberIdleText: '#1e3a6b', numberSelected: '#f4b400', numberSelectedText: '#342906',
         ticketPending: '#dbeafe', ticketWon: '#d5f5e7', ticketLost: '#ffe1e4',
         orbOne: '#cadffd', orbTwo: '#dde9ff', stageBg: '#f2f7ff', payout: '#0f7a4f', warning: '#a86000',
       };

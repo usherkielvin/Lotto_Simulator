@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
 
 import { Fonts } from '@/constants/theme';
-import { usePalette } from '@/hooks/use-palette';
 import { apiFetch } from '@/hooks/use-api';
+import { usePalette } from '@/hooks/use-palette';
+import { useSession } from '@/hooks/use-session';
 
 type TicketStatus = 'pending' | 'won' | 'lost';
 
@@ -92,19 +92,28 @@ function TicketCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePal
 
 export default function TicketsScreen() {
   const p = usePalette();
-  const { userId } = useLocalSearchParams<{ userId?: string }>();
+  const { session } = useSession();
+  const userId = session?.userId;
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const loadTickets = useCallback(() => {
     if (!userId) { setLoading(false); return; }
-    apiFetch<Ticket[]>('/bets', { userId: Number(userId) })
+    setLoading(true);
+    setError('');
+    apiFetch<Ticket[]>('/bets', { userId })
       .then(setTickets)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load tickets.'))
       .finally(() => setLoading(false));
   }, [userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadTickets();
+    }, [loadTickets])
+  );
 
   const totalWon = tickets.reduce((sum, t) => sum + (t.payout ?? 0), 0);
 

@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
-import { usePalette } from '@/hooks/use-palette';
 import { apiFetch } from '@/hooks/use-api';
+import { usePalette } from '@/hooks/use-palette';
+import { useSession } from '@/hooks/use-session';
 
 interface ProfileData {
   userId: number;
@@ -35,18 +36,24 @@ function formatPHP(v: number) {
 export default function ProfileScreen() {
   const p = usePalette();
   const router = useRouter();
-  const { userId } = useLocalSearchParams<{ userId?: string }>();
+  const { session, signOut } = useSession();
+  const userId = session?.userId;
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
-    apiFetch<ProfileData>('/profile', { userId: Number(userId) })
+    apiFetch<ProfileData>('/profile', { userId })
       .then(setProfile)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [userId]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.replace('/');
+  };
 
   const stats = profile
     ? [
@@ -132,11 +139,11 @@ export default function ProfileScreen() {
             </View>
           ))}
           <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
-          <Pressable style={s.settingsRow} onPress={() => router.replace('/')}>
+          <Pressable style={s.settingsRow} onPress={handleSignOut}>
             <View style={[s.settingsIconWrap, { backgroundColor: '#fee2e2' }]}>
               <Ionicons name="exit-outline" size={16} color="#dc2626" />
             </View>
-            <Text style={[s.settingsLabel, { color: '#dc2626' }]}>Logout</Text>
+            <Text style={[s.settingsLabel, { color: '#dc2626' }]}>Sign Out</Text>
             <Ionicons name="chevron-forward" size={16} color="#dc2626" />
           </Pressable>
         </View>

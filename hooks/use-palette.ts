@@ -5,6 +5,9 @@ export type Palette = {
   cardBg: string;
   cardBorder: string;
   heroBg: string;
+  heroText: string;
+  heroTextSoft: string;
+  heroStageBg: string;
   textStrong: string;
   textSoft: string;
   accent: string;
@@ -31,6 +34,9 @@ export function usePalette(): Palette {
       cardBg:               '#0f2344',
       cardBorder:           '#23477e',
       heroBg:               '#0d3a78',
+      heroText:             '#edf4ff',
+      heroTextSoft:         '#a9c2e6',
+      heroStageBg:          '#0a1b35',
       textStrong:           '#edf4ff',
       textSoft:             '#a9c2e6',
       accent:               '#f4b400',
@@ -54,6 +60,9 @@ export function usePalette(): Palette {
     cardBg:               '#ffffff',
     cardBorder:           '#cadbf5',
     heroBg:               '#0f4ea9',
+    heroText:             '#ffffff',
+    heroTextSoft:         'rgba(255,255,255,0.72)',
+    heroStageBg:          'rgba(255,255,255,0.15)',
     textStrong:           '#15305e',
     textSoft:             '#5a7299',
     accent:               '#f4b400',

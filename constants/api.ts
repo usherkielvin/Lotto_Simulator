@@ -1,10 +1,4 @@
-import { Platform } from 'react-native';
+const host = process.env.EXPO_PUBLIC_API_HOST ?? '192.168.137.1';
+const port = process.env.EXPO_PUBLIC_API_PORT ?? '8099';
 
-// On Android emulator, localhost refers to the emulator itself — use 10.0.2.2 to reach the host machine.
-// On iOS simulator and web, localhost works fine.
-const BASE =
-  Platform.OS === 'android'
-    ? 'http://10.0.2.2:8099/api'
-    : 'http://localhost:8099/api';
-
-export const API_BASE = BASE;
+export const API_BASE = `http://${host}:${port}/api`;

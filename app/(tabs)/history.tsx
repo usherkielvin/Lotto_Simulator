@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
 
 import { Fonts } from '@/constants/theme';
-import { usePalette } from '@/hooks/use-palette';
 import { apiFetch } from '@/hooks/use-api';
+import { usePalette } from '@/hooks/use-palette';
+import { useSession } from '@/hooks/use-session';
 
 interface DrawRecord {
   id: string;
@@ -36,19 +36,28 @@ function statusInfo(matched: number | null): { label: string; iconName: keyof ty
 
 export default function HistoryScreen() {
   const p = usePalette();
-  const { userId } = useLocalSearchParams<{ userId?: string }>();
+  const { session } = useSession();
+  const userId = session?.userId;
 
   const [history, setHistory] = useState<DrawRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const loadHistory = useCallback(() => {
     if (!userId) { setLoading(false); return; }
-    apiFetch<DrawRecord[]>('/bets/history', { userId: Number(userId) })
+    setLoading(true);
+    setError('');
+    apiFetch<DrawRecord[]>('/bets/history', { userId })
       .then(setHistory)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load history.'))
       .finally(() => setLoading(false));
   }, [userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadHistory();
+    }, [loadHistory])
+  );
 
   const totalStaked = history.reduce((s, r) => s + r.stake, 0);
   const totalPayout = history.reduce((s, r) => s + (r.payout ?? 0), 0);
