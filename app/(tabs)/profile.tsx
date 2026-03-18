@@ -124,6 +124,18 @@ export default function ProfileScreen() {
 
         <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
           <Text style={[s.sectionTitle, { color: p.textStrong }]}>Settings</Text>
+          {session?.role === 'admin' && (
+            <>
+              <Pressable style={s.settingsRow} onPress={() => router.push('/admin')}>
+                <View style={[s.settingsIconWrap, { backgroundColor: p.accent }]}>
+                  <Ionicons name="shield-checkmark-outline" size={16} color={p.accentText} />
+                </View>
+                <Text style={[s.settingsLabel, { color: p.textStrong }]}>Admin Panel</Text>
+                <Ionicons name="chevron-forward" size={16} color={p.textSoft} />
+              </Pressable>
+              <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
+            </>
+          )}
           {SETTINGS.map(({ icon, label }, i) => (
             <View key={label}>
               <Pressable style={s.settingsRow}>

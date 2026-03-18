@@ -5,6 +5,7 @@ export type Session = {
   userId: number;
   username: string;
   displayName: string;
+  role: string;
   demo: boolean;
 };
 

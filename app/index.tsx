@@ -104,6 +104,7 @@ type SessionResult = {
   userId: number;
   username: string;
   displayName: string;
+  role: string;
   demo: boolean;
 };
 
@@ -149,6 +150,7 @@ export default function LoginScreen() {
       userId: session.userId,
       username: session.username,
       displayName: session.displayName,
+      role: session.role,
       demo: session.demo,
     });
     router.replace('/(tabs)');
