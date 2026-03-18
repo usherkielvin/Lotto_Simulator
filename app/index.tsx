@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
+import { apiFetch } from '@/hooks/use-api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 type AuthPalette = {
@@ -43,9 +44,6 @@ type AuthPalette = {
   chipText: string;
   buttonIcon: string;
 };
-
-const DEMO_USERNAME = 'demo-player';
-const DEMO_PASSWORD = 'pcso2026';
 
 const lightPalette: AuthPalette = {
   page: '#edf3ff',
@@ -101,6 +99,13 @@ const darkPalette: AuthPalette = {
   buttonIcon: '#382b07',
 };
 
+type SessionResult = {
+  userId: number;
+  username: string;
+  displayName: string;
+  demo: boolean;
+};
+
 export default function LoginScreen() {
   const router = useRouter();
   const scheme = useColorScheme();
@@ -109,6 +114,7 @@ export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const heroEntrance = useRef(new Animated.Value(0)).current;
   const cardEntrance = useRef(new Animated.Value(0)).current;
@@ -134,17 +140,18 @@ export default function LoginScreen() {
   const isDark = isWeb ? useWebDark : scheme === 'dark';
   const palette = isDark ? darkPalette : lightPalette;
 
-  const enterHome = (name: string, isDemo: boolean) => {
+  const enterHome = (session: SessionResult) => {
     router.replace({
-      pathname: '/(tabs)/',
+      pathname: '/(tabs)',
       params: {
-        user: name,
-        demo: isDemo ? '1' : '0',
+        user: session.displayName,
+        userId: String(session.userId),
+        demo: session.demo ? '1' : '0',
       },
     });
   };
 
-  const onLogin = () => {
+  const onLogin = async () => {
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
@@ -152,21 +159,37 @@ export default function LoginScreen() {
       setError('Enter both username and password to continue.');
       return;
     }
-
     if (cleanPassword.length < 4) {
       setError('Password must be at least 4 characters.');
       return;
     }
 
     setError('');
-    enterHome(cleanUsername, false);
+    setLoading(true);
+    try {
+      const session = await apiFetch<SessionResult>('/auth/login', {
+        method: 'POST',
+        body: { username: cleanUsername, password: cleanPassword },
+      });
+      enterHome(session);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const onDemoLogin = () => {
-    setUsername(DEMO_USERNAME);
-    setPassword(DEMO_PASSWORD);
+  const onDemoLogin = async () => {
     setError('');
-    enterHome('Demo Account', true);
+    setLoading(true);
+    try {
+      const session = await apiFetch<SessionResult>('/auth/demo', { method: 'POST' });
+      enterHome(session);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Demo login failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const heroAnimatedStyle = {
@@ -279,14 +302,20 @@ export default function LoginScreen() {
 
           {error ? <Text style={[styles.errorText, { color: palette.error }]}>{error}</Text> : null}
 
-          <Pressable style={[styles.loginButton, { backgroundColor: palette.primaryButton }]} onPress={onLogin}>
-            <Text style={[styles.loginLabel, { color: palette.primaryButtonText }]}>Login Account</Text>
+          <Pressable
+            style={[styles.loginButton, { backgroundColor: palette.primaryButton, opacity: loading ? 0.7 : 1 }]}
+            onPress={onLogin}
+            disabled={loading}>
+            <Text style={[styles.loginLabel, { color: palette.primaryButtonText }]}>
+              {loading ? 'Signing in…' : 'Login Account'}
+            </Text>
             <Ionicons name="arrow-forward" size={16} color={palette.buttonIcon} />
           </Pressable>
 
           <Pressable
-            style={[styles.demoButton, { backgroundColor: palette.secondaryButton }]}
-            onPress={onDemoLogin}>
+            style={[styles.demoButton, { backgroundColor: palette.secondaryButton, opacity: loading ? 0.7 : 1 }]}
+            onPress={onDemoLogin}
+            disabled={loading}>
             <Ionicons name="flash-outline" size={15} color={palette.secondaryButtonText} />
             <Text style={[styles.demoLabel, { color: palette.secondaryButtonText }]}>Use Demo Account</Text>
           </Pressable>
@@ -299,155 +328,27 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  orbTop: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    right: -80,
-    top: -70,
-    opacity: 0.58,
-  },
-  orbBottom: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    left: -120,
-    bottom: -120,
-    opacity: 0.45,
-  },
-  keyboardContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-    gap: 14,
-  },
-  hero: {
-    borderRadius: 22,
-    paddingHorizontal: 18,
-    paddingVertical: 20,
-  },
-  heroTag: {
-    fontSize: 11,
-    letterSpacing: 1,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    fontFamily: Fonts.mono,
-  },
-  heroTitle: {
-    marginTop: 8,
-    fontSize: 30,
-    fontWeight: '800',
-    fontFamily: Fonts.rounded,
-  },
-  heroSubtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '500',
-    fontFamily: Fonts.sans,
-  },
-  heroChipRow: {
-    marginTop: 12,
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  heroChip: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  heroChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    fontFamily: Fonts.mono,
-  },
-  toggleButton: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  toggleLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    fontFamily: Fonts.sans,
-  },
-  card: {
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 18,
-    shadowColor: '#001d4c',
-    shadowOpacity: 0.14,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    fontFamily: Fonts.mono,
-  },
-  passwordLabel: {
-    marginTop: 14,
-  },
-  input: {
-    marginTop: 8,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontFamily: Fonts.sans,
-  },
-  errorText: {
-    marginTop: 12,
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: Fonts.sans,
-  },
-  loginButton: {
-    marginTop: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    paddingVertical: 13,
-  },
-  loginLabel: {
-    fontSize: 16,
-    fontWeight: '800',
-    fontFamily: Fonts.rounded,
-  },
-  demoButton: {
-    marginTop: 10,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 7,
-    paddingVertical: 12,
-  },
-  demoLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    fontFamily: Fonts.sans,
-  },
-  helperText: {
-    marginTop: 12,
-    fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 18,
-    fontFamily: Fonts.sans,
-  },
+  safeArea: { flex: 1 },
+  orbTop:    { position: 'absolute', width: 280, height: 280, borderRadius: 140, right: -80,   top: -70,    opacity: 0.58 },
+  orbBottom: { position: 'absolute', width: 300, height: 300, borderRadius: 150, left: -120,   bottom: -120, opacity: 0.45 },
+  keyboardContainer: { flex: 1, justifyContent: 'center', paddingHorizontal: 18, gap: 14 },
+  hero:         { borderRadius: 22, paddingHorizontal: 18, paddingVertical: 20 },
+  heroTag:      { fontSize: 11, letterSpacing: 1, fontWeight: '700', textTransform: 'uppercase', fontFamily: Fonts.mono },
+  heroTitle:    { marginTop: 8, fontSize: 30, fontWeight: '800', fontFamily: Fonts.rounded },
+  heroSubtitle: { marginTop: 8, fontSize: 14, lineHeight: 21, fontWeight: '500', fontFamily: Fonts.sans },
+  heroChipRow:  { marginTop: 12, flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  heroChip:     { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  heroChipText: { fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono },
+  toggleButton: { marginTop: 12, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  toggleLabel:  { fontSize: 12, fontWeight: '700', fontFamily: Fonts.sans },
+  card:         { borderRadius: 22, borderWidth: 1, padding: 18, shadowColor: '#001d4c', shadowOpacity: 0.14, shadowRadius: 15, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
+  inputLabel:   { fontSize: 13, fontWeight: '700', fontFamily: Fonts.mono },
+  passwordLabel:{ marginTop: 14 },
+  input:        { marginTop: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, fontSize: 15, fontFamily: Fonts.sans },
+  errorText:    { marginTop: 12, fontSize: 13, fontWeight: '600', fontFamily: Fonts.sans },
+  loginButton:  { marginTop: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingVertical: 13 },
+  loginLabel:   { fontSize: 16, fontWeight: '800', fontFamily: Fonts.rounded },
+  demoButton:   { marginTop: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7, paddingVertical: 12 },
+  demoLabel:    { fontSize: 14, fontWeight: '700', fontFamily: Fonts.sans },
+  helperText:   { marginTop: 12, fontSize: 12, fontWeight: '500', lineHeight: 18, fontFamily: Fonts.sans },
 });
