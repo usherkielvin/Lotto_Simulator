@@ -52,7 +52,7 @@ export default function ProfileScreen() {
 
   const handleSignOut = async () => {
     await signOut();
-    router.replace('/');
+    router.replace('/login');
   };
 
   const stats = profile
