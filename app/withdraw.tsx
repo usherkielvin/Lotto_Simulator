@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { apiFetch } from '@/hooks/use-api';
+import { useBalance } from '@/hooks/use-balance';
 import { usePalette } from '@/hooks/use-palette';
 import { useSession } from '@/hooks/use-session';
 
@@ -19,21 +20,17 @@ export default function WithdrawScreen() {
   const p = usePalette();
   const router = useRouter();
   const { session } = useSession();
+  const { balance: globalBalance, applyDelta } = useBalance();
   const userId = session?.userId;
 
-  const [balance, setBalance] = useState<number | null>(null);
   const [amount,  setAmount]  = useState('');
   const [busy,    setBusy]    = useState(false);
   const [msg,     setMsg]     = useState('');
   const [isErr,   setIsErr]   = useState(false);
   const [newBal,  setNewBal]  = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!userId) return;
-    apiFetch<{ balance: number }>('/bets/balance', { userId })
-      .then((r) => setBalance(Number(r.balance)))
-      .catch(() => {});
-  }, [userId]);
+  // use global balance as the displayed available balance
+  const balance = globalBalance;
 
   const confirm = async () => {
     const val = parseFloat(amount);
@@ -46,10 +43,10 @@ export default function WithdrawScreen() {
         method: 'POST', userId, body: { type: 'withdraw', amount: val },
       });
       setNewBal(Number(res.balance));
-      setBalance(Number(res.balance));
       setAmount('');
       setIsErr(false);
       setMsg(`Successfully withdrawn ${formatPHP(val)}.`);
+      applyDelta(-val);
     } catch (e: unknown) {
       setIsErr(true);
       setMsg(e instanceof Error ? e.message : 'Withdrawal failed.');

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { apiFetch } from '@/hooks/use-api';
+import { useBalance } from '@/hooks/use-balance';
 import { usePalette } from '@/hooks/use-palette';
 import { useSession } from '@/hooks/use-session';
 
@@ -19,6 +20,7 @@ export default function DepositScreen() {
   const p = usePalette();
   const router = useRouter();
   const { session } = useSession();
+  const { applyDelta } = useBalance();
   const userId = session?.userId;
 
   const [amount, setAmount] = useState('');
@@ -38,6 +40,7 @@ export default function DepositScreen() {
         method: 'POST', userId, body: { type: 'deposit', amount: val },
       });
       setNewBal(Number(res.balance));
+      applyDelta(val);
       setAmount('');
       setIsErr(false);
       setMsg(`Successfully deposited ${formatPHP(val)}.`);

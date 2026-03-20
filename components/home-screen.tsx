@@ -19,6 +19,8 @@ import { useSession } from '@/hooks/use-session';
 
 type BetMode = 'manual' | 'lucky';
 
+type GameType = '2number' | '3digit' | '4digit' | '6digit' | '6number';
+
 type LottoGame = {
   id: string;
   name: string;
@@ -76,19 +78,32 @@ function pickUniqueNumbers(max: number, count: number, rand: () => number = Math
   return Array.from(picked).sort((a,b) => a-b);
 }
 
-function getGameType(gameId: string): '2number' | '3digit' | '4digit' | '6digit' | '6number' {
-  if (gameId === '2d-ez2') return '2number';
-  if (gameId === '3d-swertres') return '3digit';
-  if (gameId === '4digit') return '4digit';
-  if (gameId === '6digit') return '6digit';
+function getGameType(game: Pick<LottoGame, 'id' | 'name' | 'maxNumber'> | string): GameType {
+  const identity = typeof game === 'string' ? game : `${game.id} ${game.name ?? ''}`;
+  const normalized = identity.toLowerCase();
+
+  if (normalized.includes('2d') || normalized.includes('ez2')) return '2number';
+  if (normalized.includes('3d') || normalized.includes('swertres')) return '3digit';
+  if (normalized.includes('4d') || normalized.includes('4-digit')) return '4digit';
+  if (normalized.includes('6digit') || normalized.includes('6-digit') || /\b6d\b/.test(normalized)) {
+    return '6digit';
+  }
+
+  // Fallback guards for inconsistent backend IDs/names.
+  if (typeof game !== 'string') {
+    if (game.maxNumber === 999) return '3digit';
+    if (game.maxNumber === 9999) return '4digit';
+    if (game.maxNumber === 9 && normalized.includes('digit')) return '6digit';
+  }
+
   return '6number';
 }
 
-function isDigitGame(gameType: '2number' | '3digit' | '4digit' | '6digit' | '6number'): boolean {
+function isDigitGame(gameType: GameType): boolean {
   return gameType === '3digit' || gameType === '4digit' || gameType === '6digit';
 }
 
-function getRequiredDigits(gameType: '2number' | '3digit' | '4digit' | '6digit' | '6number'): number {
+function getRequiredDigits(gameType: GameType): number {
   switch (gameType) {
     case '2number': return 2;
     case '3digit': return 3;
@@ -99,7 +114,7 @@ function getRequiredDigits(gameType: '2number' | '3digit' | '4digit' | '6digit' 
 }
 
 function buildOfficialNumbers(game: LottoGame, key: string) {
-  const gameType = getGameType(game.id);
+  const gameType = getGameType(game);
   const requiredCount = getRequiredDigits(gameType);
   const isDigit = isDigitGame(gameType);
 
@@ -194,7 +209,7 @@ export default function HomeScreen() {
   const [betMode, setBetMode] = useState<BetMode>('manual');
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [stake, setStake] = useState(MIN_STAKE);
-  const [notice, setNotice] = useState('Select a game, pick six numbers, and place your demo bet.');
+  const [notice, setNotice] = useState('Select a game and build your bet slip to continue.');
   const [now, setNow] = useState(() => new Date());
   const [placingBet, setPlacingBet] = useState(false);
 
@@ -273,7 +288,7 @@ export default function HomeScreen() {
   const numberOptions = useMemo(
     () => {
       if (!selectedGame) return [];
-      const gameType = getGameType(selectedGame.id);
+      const gameType = getGameType(selectedGame);
       const isDigit = isDigitGame(gameType);
       if (isDigit) {
         // 3D, 4D, 6D: Show digits 0-9
@@ -336,7 +351,7 @@ export default function HomeScreen() {
 
   const createLuckyPick = () => {
     if (!selectedGame) return;
-    const gameType = getGameType(selectedGame.id);
+    const gameType = getGameType(selectedGame);
     const requiredCount = getRequiredDigits(gameType);
     const isDigit = isDigitGame(gameType);
     let nums: number[] = [];
@@ -358,7 +373,7 @@ export default function HomeScreen() {
 
   const toggleManualNumber = (v: number) => {
     if (betMode !== 'manual') return;
-    const gameType = getGameType(selectedGame?.id || '');
+    const gameType = getGameType(selectedGame ?? '');
     const requiredCount = getRequiredDigits(gameType);
     const allowsDuplicates = gameType !== '6number'; // 2D, 3D, 4D, 6D allow duplicates
 
@@ -400,7 +415,7 @@ export default function HomeScreen() {
       return;
     }
 
-    const gameType = getGameType(selectedGame.id);
+    const gameType = getGameType(selectedGame);
     const requiredCount = getRequiredDigits(gameType);
     const isDigit = isDigitGame(gameType);
 
@@ -729,7 +744,7 @@ export default function HomeScreen() {
           )}
 
           {selectedGame && (() => {
-            const gameType = getGameType(selectedGame.id);
+            const gameType = getGameType(selectedGame);
             const requiredCount = getRequiredDigits(gameType);
             const isDigit = isDigitGame(gameType);
             const is2D = gameType === '2number';
@@ -790,7 +805,7 @@ export default function HomeScreen() {
           })()}
 
           {selectedGame && (() => {
-            const gameType = getGameType(selectedGame.id);
+            const gameType = getGameType(selectedGame);
             const is2D = gameType === '2number';
             
             if (is2D) {

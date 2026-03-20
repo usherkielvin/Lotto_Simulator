@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BalanceProvider } from '@/hooks/use-balance';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnectivity } from '@/hooks/use-connectivity';
 import { SessionProvider, useSession } from '@/hooks/use-session';
@@ -88,11 +89,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SessionProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <OfflineBanner />
-          <RootLayoutNav />
-          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        </ThemeProvider>
+        <BalanceProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <OfflineBanner />
+            <RootLayoutNav />
+            <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+          </ThemeProvider>
+        </BalanceProvider>
       </SessionProvider>
     </GestureHandlerRootView>
   );
