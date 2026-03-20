@@ -250,8 +250,8 @@ export default function LoginScreen() {
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <Animated.View style={[styles.hero, { backgroundColor: palette.hero }, heroAnimatedStyle]}>
-          <Text style={[styles.heroTag, { color: palette.heroSubtitle }]}>PCSO DEMO DRAW HUB</Text>
-          <Text style={[styles.heroTitle, { color: palette.heroTitle }]}>PCSO Lotto Simulator</Text>
+          <Text style={[styles.heroTag, { color: palette.heroSubtitle }]}>DEMO DRAW HUB</Text>
+          <Text style={[styles.heroTitle, { color: palette.heroTitle }]}>Lotto Simulator</Text>
           <Text style={[styles.heroSubtitle, { color: palette.heroSubtitle }]}>
             Place demo bets, track your tickets, and settle results on the daily 9:00 PM draw schedule.
           </Text>

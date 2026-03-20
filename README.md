@@ -1,50 +1,159 @@
-# Welcome to your Expo app 👋
+# Lotto Simulator
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A full-stack lottery simulation app built with Expo, React Native, TypeScript, and a Spring Boot API.
 
-## Get started
+It simulates a PCSO-style betting flow: pick numbers, place bets, track tickets, settle results, and manage wallet transactions with role-aware admin tools.
 
-1. Install dependencies
+## Project Highlights
 
-   ```bash
-   npm install
-   ```
+- Multi-game lotto simulator with daily and scheduled draw availability
+- 9:00 PM draw countdown and draw lock logic
+- Manual pick + lucky pick betting modes
+- Ticket tracking (active and settled history)
+- Wallet actions: deposit, withdraw, and funding history
+- Admin result management panel
+- Offline explore mode with cached read endpoints
+- Unified light/dark palette with custom liquid-style tab UI
 
-2. Start the app
+## UI Showcase
 
-   ```bash
-   npx expo start
-   ```
+The app is designed as a polished mobile-first product UI (not a starter template):
 
-In the output, you'll find options to open the app in a
+- Auth screen: animated hero card, branded palette, signup/login switch, and web-only theme toggle
+- Home dashboard: jackpot carousel, draw countdown, balance tile, and categorized game selector
+- Bet builder: game-aware number picking for 2D, 3D, 4D, 6D, and 6-number lotteries
+- My Bets: active tickets and results history with match-aware visual states
+- Profile: player stats, lucky numbers, wallet quick actions, and admin access shortcut
+- Wallet screens: dedicated deposit/withdraw flows plus funding ledger
+- Navigation: custom blurred liquid tab bar with haptics and gesture interactions
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Tech Stack
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Frontend (this repo):
 
-## Get a fresh project
+- Expo SDK 54 + Expo Router
+- React Native 0.81 + React 19
+- TypeScript (strict mode)
+- AsyncStorage + NetInfo for session/cache/offline support
+- Jest for logic and regression tests
 
-When you're ready, run:
+Backend (sibling repo in this workspace: ../lotto):
 
-```bash
-npm run reset-project
+- Spring Boot 3.4.1 (Java 21)
+- Spring Data JPA + MySQL
+- Spring Security (BCrypt)
+
+## App Routes
+
+- / (auth entry)
+- /login (alias to auth entry)
+- /(tabs) (main app shell)
+- /(tabs)/index (home / bet builder)
+- /(tabs)/tickets (ticket center)
+- /(tabs)/profile (profile and actions)
+- /deposit
+- /withdraw
+- /funding-history
+- /admin (admin role)
+
+## API Snapshot
+
+Base URL (frontend expects):
+
+```txt
+http://<EXPO_PUBLIC_API_HOST>:<EXPO_PUBLIC_API_PORT>/api
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Main route groups:
 
-## Learn more
+- /api/auth (login, register, demo)
+- /api/games (available lotto games)
+- /api/bets (place bet, active bets, history, balance, funding)
+- /api/profile (player summary)
+- /api/admin/results (admin result CRUD)
 
-To learn more about developing your project with Expo, look at the following resources:
+## Local Setup
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### 1) Start Backend (Spring Boot)
 
-## Join the community
+From ../lotto:
 
-Join our community of developers creating universal apps.
+```bash
+./mvnw spring-boot:run
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+On Windows PowerShell:
+
+```powershell
+.\mvnw spring-boot:run
+```
+
+Backend defaults:
+
+- Port: 8099
+- MySQL database: lottodb
+- Schema seed file: src/main/resources/schema.sql
+
+Before running first time, update DB credentials in:
+
+- ../lotto/src/main/resources/application.properties
+
+### 2) Start Frontend (Expo)
+
+From this folder:
+
+```bash
+npm install
+npx expo start -c
+```
+
+Optional env overrides (recommended):
+
+```env
+EXPO_PUBLIC_API_HOST=127.0.0.1
+EXPO_PUBLIC_API_PORT=8099
+```
+
+Note:
+
+- For Android emulator, host is commonly 10.0.2.2 instead of 127.0.0.1.
+- For physical devices, use your machine LAN IP.
+
+## Scripts
+
+- npm run start - start Expo
+- npm run android - run Android target
+- npm run ios - run iOS target
+- npm run web - run web target
+- npm run lint - run Expo lint config
+- npm run test - run Jest tests
+
+## Testing
+
+Frontend:
+
+```bash
+npm test
+```
+
+Backend:
+
+```bash
+cd ../lotto
+./mvnw test
+```
+
+## Repository Structure
+
+```txt
+lottosimulator/
+  app/                # Expo Router routes (auth, tabs, wallet, admin)
+  components/         # Screen-level and shared UI components
+  hooks/              # API, session, palette, connectivity helpers
+  constants/          # Theme and API constants
+  __tests__/          # Home-screen regression and preservation tests
+```
+
+## Status
+
+Active development. Current focus is product-level UX polish, gameplay accuracy, and stable full-stack local workflows.
