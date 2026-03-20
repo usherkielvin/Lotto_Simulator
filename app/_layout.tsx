@@ -39,10 +39,9 @@ function RootLayoutNav() {
     if (loading) return;
 
     const inTabs = segments[0] === '(tabs)';
-    const inAdmin = segments[0] === 'admin';
     const onAuthRoute = pathname === '/' || pathname === '/login';
 
-    if (session && onAuthRoute && !inTabs && !inAdmin) {
+    if (session && onAuthRoute && !inTabs) {
       router.replace('/(tabs)');
       return;
     }
@@ -75,7 +74,6 @@ function RootLayoutNav() {
   // If authenticated or offline-browse mode, show tabs
   return <Stack key={canBrowseOffline ? 'offline-app' : 'app'} screenOptions={{ headerShown: false }}>
     <Stack.Screen name="(tabs)" />
-    {session && <Stack.Screen name="admin" />}
     {session && <Stack.Screen name="deposit" />}
     {session && <Stack.Screen name="withdraw" />}
     {session && <Stack.Screen name="funding-history" />}

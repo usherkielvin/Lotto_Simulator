@@ -256,8 +256,14 @@ export default function HomeScreen() {
     apiFetch<LottoGame[]>('/games')
       .then(data => {
         setGames(data);
-        const firstMajor = data.find(g => MAJOR_LOTTO_IDS.includes(g.id));
-        setSelectedGameId(firstMajor?.id ?? data[0]?.id ?? '');
+        const today = new Date();
+        const firstMajorAvailable = data.find(g => MAJOR_LOTTO_IDS.includes(g.id) && isGameAvailableToday(g, today));
+        const initialId = firstMajorAvailable?.id 
+          ?? data.find(g => isGameAvailableToday(g, today))?.id 
+          ?? data.find(g => MAJOR_LOTTO_IDS.includes(g.id))?.id 
+          ?? data[0]?.id 
+          ?? '';
+        setSelectedGameId(initialId);
       })
       .catch(() => setNotice('Could not load games. Is the server running?'))
       .finally(() => setGamesLoading(false));
@@ -507,7 +513,7 @@ export default function HomeScreen() {
         {/* Admin Home */}
         {isAdmin ? (
           <>
-            <View style={[styles.heroCard, { backgroundColor: palette.heroBg }]}>
+            <View style={[styles.heroCard, { backgroundColor: palette.heroBg, marginBottom: 20 }]}>
               <View style={styles.heroTopRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.heroTag, { color: 'rgba(255,255,255,0.60)' }]}>LOTTO SIMULATOR</Text>
@@ -518,37 +524,90 @@ export default function HomeScreen() {
                 </View>
                 <View style={[styles.demoBadge, { backgroundColor: 'rgba(244,180,0,0.18)' }]}>
                   <Ionicons name="shield-checkmark-outline" size={12} color={palette.accent} />
-                  <Text style={[styles.demoBadgeText, { color: palette.accent }]}>Admin</Text>
+                  <Text style={[styles.demoBadgeText, { color: palette.accent }]}>Admin Dashboard</Text>
                 </View>
               </View>
             </View>
 
-            <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <Ionicons name="grid-outline" size={20} color={palette.accent} />
-                <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Game Schedule</Text>
-              </View>
-              {gamesLoading ? (
-                <ActivityIndicator color={palette.accent} />
-              ) : (
-                <View style={{ gap: 8 }}>
-                  {games.map(g => {
-                    const available = isGameAvailableToday(g, now);
-                    return (
-                      <View key={g.id} style={[styles.gameChip, { backgroundColor: available ? palette.chipActive : palette.chipIdle, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10 }]}>
-                        <Text style={[styles.gameChipLabel, { color: available ? palette.chipActiveText : palette.chipIdleText }]}>{g.name}</Text>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                          <Ionicons name={available ? 'checkmark-circle' : 'time-outline'} size={13} color={available ? palette.chipActiveText : palette.chipIdleText} />
-                          <Text style={[styles.gameChipSub, { color: available ? palette.chipActiveText : palette.chipIdleText }]}>
-                            {available ? g.drawTime : getNextDrawDate(g, now)}
-                          </Text>
+            {gamesLoading ? (
+              <ActivityIndicator color={palette.accent} style={{ marginTop: 40 }} />
+            ) : (
+              <>
+                {/* Major Lottos Section */}
+                <View style={[styles.heroSection, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+                  <View style={styles.heroHeader}>
+                    <View style={[styles.heroIcon, { backgroundColor: palette.accent + '20' }]}>
+                      <Ionicons name="trophy" size={20} color={palette.accent} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.heroTitleHero, { color: palette.textStrong }]}>Major Lottos</Text>
+                      <Text style={[styles.heroSubtitleHero, { color: palette.textSoft }]}>Game schedules and availability</Text>
+                    </View>
+                    <View style={[styles.heroBadgeHero, { backgroundColor: palette.chipIdle }]}>
+                      <Text style={[styles.heroBadgeTextHero, { color: palette.chipIdleText }]}>{majorGames.length}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.heroContentHero}>
+                    {majorGames.map(g => {
+                      const available = isGameAvailableToday(g, now);
+                      return (
+                        <View key={g.id} style={[styles.gameScheduleRow, { borderBottomColor: palette.cardBorder }]}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.gameScheduleName, { color: palette.textStrong }]}>{g.name}</Text>
+                            <Text style={[styles.gameScheduleTime, { color: palette.textSoft, fontSize: 11 }]}>
+                              {available ? g.drawTime : getNextDrawDate(g, now)}
+                            </Text>
+                          </View>
+                          <View style={[styles.gameScheduleBadge, { backgroundColor: available ? palette.chipActive : palette.chipIdle }]}>
+                            <Ionicons name={available ? 'checkmark-circle' : 'time-outline'} size={12} color={available ? palette.chipActiveText : palette.chipIdleText} />
+                            <Text style={[styles.gameScheduleBadgeText, { color: available ? palette.chipActiveText : palette.chipIdleText }]}>
+                              {available ? 'LIVE TODAY' : 'OFF DAY'}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    );
-                  })}
+                      );
+                    })}
+                  </View>
                 </View>
-              )}
-            </View>
+
+                {/* Digit Games Section */}
+                <View style={[styles.heroSection, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+                  <View style={styles.heroHeader}>
+                    <View style={[styles.heroIcon, { backgroundColor: palette.payout + '20' }]}>
+                      <Ionicons name="apps" size={20} color={palette.payout} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.heroTitleHero, { color: palette.textStrong }]}>Digit Games</Text>
+                      <Text style={[styles.heroSubtitleHero, { color: palette.textSoft }]}>Daily 2D, 3D, 4D, and 6D draws</Text>
+                    </View>
+                    <View style={[styles.heroBadgeHero, { backgroundColor: palette.chipIdle }]}>
+                      <Text style={[styles.heroBadgeTextHero, { color: palette.chipIdleText }]}>{smallGames.length}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.heroContentHero}>
+                    {smallGames.map(g => {
+                      const available = isGameAvailableToday(g, now);
+                      return (
+                        <View key={g.id} style={[styles.gameScheduleRow, { borderBottomColor: palette.cardBorder }]}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.gameScheduleName, { color: palette.textStrong }]}>{g.name}</Text>
+                            <Text style={[styles.gameScheduleTime, { color: palette.textSoft, fontSize: 11 }]}>
+                              {available ? g.drawTime : getNextDrawDate(g, now)}
+                            </Text>
+                          </View>
+                          <View style={[styles.gameScheduleBadge, { backgroundColor: available ? palette.chipActive : palette.chipIdle }]}>
+                            <Ionicons name={available ? 'checkmark-circle' : 'time-outline'} size={12} color={available ? palette.chipActiveText : palette.chipIdleText} />
+                            <Text style={[styles.gameScheduleBadgeText, { color: available ? palette.chipActiveText : palette.chipIdleText }]}>
+                              {available ? 'LIVE TODAY' : 'OFF DAY'}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              </>
+            )}
           </>
         ) : (
           <>
@@ -674,7 +733,7 @@ export default function HomeScreen() {
                     </View>
 
                     {/* Jackpot amount */}
-                    <Text style={[styles.jackpotAmount, { color: palette.accent }]}>
+                    <Text style={[styles.jackpotAmount, { color: availableToday ? palette.accent : palette.textStrong }]}>
                       {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(g.jackpot)}
                     </Text>
                     <Text style={[styles.jackpotLabel, { color: palette.textSoft }]}>
@@ -770,11 +829,12 @@ export default function HomeScreen() {
                     {majorGames.map((game) => {
                       const active = game.id === selectedGame?.id;
                       const available = isGameAvailableToday(game, now);
+                      const activeColor = available ? palette.chipActive : palette.chipIdle;
                       return (
                         <Pressable key={game.id} onPress={() => available && selectGame(game.id)} disabled={!available}
-                          style={[styles.gameChip, { backgroundColor: active ? palette.chipActive : palette.chipIdle, opacity: available ? 1 : 0.4 }]}>
-                          <Text style={[styles.gameChipLabel, { color: active ? palette.chipActiveText : palette.chipIdleText }]}>{game.name}</Text>
-                          <Text style={[styles.gameChipSub, { color: active ? palette.chipActiveText : palette.chipIdleText }]}>
+                          style={[styles.gameChip, { backgroundColor: active ? activeColor : palette.chipIdle, opacity: available ? 1 : 0.4 }]}>
+                          <Text style={[styles.gameChipLabel, { color: active && available ? palette.chipActiveText : palette.chipIdleText }]}>{game.name}</Text>
+                          <Text style={[styles.gameChipSub, { color: active && available ? palette.chipActiveText : palette.chipIdleText }]}>
                             {available ? game.drawTime : getNextDrawDate(game, now)}
                           </Text>
                         </Pressable>
@@ -788,11 +848,12 @@ export default function HomeScreen() {
                     {smallGames.map((game) => {
                       const active = game.id === selectedGame?.id;
                       const available = isGameAvailableToday(game, now);
+                      const activeColor = available ? palette.chipActive : palette.chipIdle;
                       return (
                         <Pressable key={game.id} onPress={() => available && selectGame(game.id)} disabled={!available}
-                          style={[styles.gameChip, { backgroundColor: active ? palette.chipActive : palette.chipIdle, opacity: available ? 1 : 0.4 }]}>
-                          <Text style={[styles.gameChipLabel, { color: active ? palette.chipActiveText : palette.chipIdleText }]}>{game.name}</Text>
-                          <Text style={[styles.gameChipSub, { color: active ? palette.chipActiveText : palette.chipIdleText }]}>
+                          style={[styles.gameChip, { backgroundColor: active ? activeColor : palette.chipIdle, opacity: available ? 1 : 0.4 }]}>
+                          <Text style={[styles.gameChipLabel, { color: active && available ? palette.chipActiveText : palette.chipIdleText }]}>{game.name}</Text>
+                          <Text style={[styles.gameChipSub, { color: active && available ? palette.chipActiveText : palette.chipIdleText }]}>
                             {available ? game.drawTime : getNextDrawDate(game, now)}
                           </Text>
                         </Pressable>
@@ -1145,7 +1206,19 @@ const styles = StyleSheet.create({
   jackpotBetBtnText:    { fontSize: 13, fontWeight: '800', fontFamily: Fonts.rounded },
   dotRow:               { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 14 },
   dot:                  { height: 7, borderRadius: 4 },
-  categorySection: { marginTop: 12 },
-  categoryLabel:   { fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }
+  // Hero Sections
+  heroSection:    { borderRadius: 20, borderWidth: 1, overflow: 'hidden', marginBottom: 20 },
+  heroHeader:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.1)' },
+  heroIcon:       { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  heroTitleHero:  { fontSize: 16, fontWeight: '900', fontFamily: Fonts.rounded, textTransform: 'uppercase', letterSpacing: 0.5 },
+  heroSubtitleHero: { fontSize: 11, fontWeight: '500', fontFamily: Fonts.sans, marginTop: 1 },
+  heroBadgeHero:  { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  heroBadgeTextHero: { fontSize: 12, fontWeight: '800', fontFamily: Fonts.mono },
+  heroContentHero: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 6 },
+  gameScheduleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.05)' },
+  gameScheduleName: { fontSize: 14, fontWeight: '700', fontFamily: Fonts.sans },
+  gameScheduleTime: { fontSize: 12, fontWeight: '600', fontFamily: Fonts.mono },
+  gameScheduleBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  gameScheduleBadgeText: { fontSize: 10, fontWeight: '800', fontFamily: Fonts.mono },
 });
 

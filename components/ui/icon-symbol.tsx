@@ -23,6 +23,7 @@ const MAPPING = {
   'ticket.fill': 'casino',
   'trophy.fill': 'emoji-events',
   'star.fill': 'star',
+  'chart.bar.fill': 'bar-chart',
   'gearshape.fill': 'settings',
   'shield.fill': 'admin-panel-settings',
 } as IconMapping;

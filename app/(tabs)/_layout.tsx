@@ -39,7 +39,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="tickets"
         options={{
-          title: 'My Bets',
+          title: 'Tickets',
           href: isAdmin ? null : undefined,
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="ticket.fill" color={color} />
@@ -52,7 +52,17 @@ export default function TabLayout() {
           title: 'Results',
           href: isAdmin ? undefined : null,
           tabBarIcon: ({ color, size }) => (
-            <IconSymbol size={size} name="trophy.fill" color={color} />
+            <IconSymbol size={size} name="chart.bar.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="results"
+        options={{
+          title: 'Results',
+          href: isAdmin ? null : undefined,
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="chart.bar.fill" color={color} />
           ),
         }}
       />

@@ -101,7 +101,7 @@ export default function ProfileScreen() {
   const settings = isAdmin ? ADMIN_SETTINGS : PLAYER_SETTINGS;
 
   return (
-    <SafeAreaView style={[s.root, { backgroundColor: p.screenBg }]}>
+    <SafeAreaView style={[s.root, { backgroundColor: p.screenBg }]} edges={['top']}>
       <View style={[s.orbTop, { backgroundColor: p.orbOne }]} />
       <View style={[s.orbBottom, { backgroundColor: p.orbTwo }]} />
 

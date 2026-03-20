@@ -30,9 +30,15 @@ function formatPHP(v: number) {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 }).format(v);
 }
 
+function formatDateStr(dateKey: string) {
+  if (!dateKey) return '';
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return `${m}/${d}/${y}`;
+}
+
 function formatTicketDrawLabel(ticket: Ticket) {
   const drawTime = ticket.drawTime?.trim();
-  return `Draw: ${ticket.drawDateKey} · ${drawTime && drawTime.length > 0 ? drawTime : '9:00 PM'}`;
+  return `Draw: ${formatDateStr(ticket.drawDateKey)} · ${drawTime && drawTime.length > 0 ? drawTime : '9:00 PM'}`;
 }
 
 function ActiveCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePalette> }) {
@@ -92,7 +98,7 @@ function HistoryCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePa
       <View style={s.cardHead}>
         <View style={{ flex: 1 }}>
           <Text style={[s.cardGame, { color: cardTxt }]}>{ticket.gameName}</Text>
-          <Text style={[s.cardMeta, { color: cardSub }]}>{ticket.drawDateKey}{drawTime ? ` · ${drawTime}` : ''}</Text>
+          <Text style={[s.cardMeta, { color: cardSub }]}>{formatDateStr(ticket.drawDateKey)}{drawTime ? ` · ${drawTime}` : ''}</Text>
         </View>
         <View style={[s.badge, { backgroundColor: badgeBg }]}>
           <Ionicons name={iconName} size={12} color={badgeTxt} />
