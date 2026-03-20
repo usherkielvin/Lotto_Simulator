@@ -459,7 +459,7 @@ export default function HomeScreen() {
           {/* Top row: greeting + demo badge */}
           <View style={styles.heroTopRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.heroTag, { color: 'rgba(255,255,255,0.60)' }]}>PCSO LOTTO SIMULATOR</Text>
+              <Text style={[styles.heroTag, { color: 'rgba(255,255,255,0.60)' }]}>LOTTO SIMULATOR</Text>
               <Text style={[styles.heroTitle, { color: '#ffffff' }]}>Hi, {displayName}</Text>
             </View>
             {isDemoUser && (

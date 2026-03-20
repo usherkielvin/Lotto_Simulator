@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,190 +9,232 @@ import { apiFetch } from '@/hooks/use-api';
 import { usePalette } from '@/hooks/use-palette';
 import { useSession } from '@/hooks/use-session';
 
-interface ProfileData {
-  userId: number;
-  username: string;
-  displayName: string;
-  memberSince: string;
-  balance: number;
-  totalPlays: number;
-  prizesWon: number;
-  bestMatch: number;
-  winRate: string;
-  luckyNumbers: number[];
-}
-
-const SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
-  { icon: 'notifications-outline', label: 'Draw notifications' },
-  { icon: 'color-palette-outline', label: 'App theme'          },
-  { icon: 'help-circle-outline',   label: 'Help & support'     },
-  { icon: 'lock-closed-outline',   label: 'Privacy & data'     },
-];
+type ProfileData = {
+	userId: number;
+	username: string;
+	displayName: string;
+	memberSince: string;
+	balance: number;
+	totalPlays: number;
+	prizesWon: number;
+	bestMatch: number;
+	winRate: string;
+	luckyNumbers: number[];
+};
 
 function formatPHP(v: number) {
-  return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 }).format(v);
+	return new Intl.NumberFormat('en-PH', {
+		style: 'currency',
+		currency: 'PHP',
+		minimumFractionDigits: 0,
+	}).format(v);
 }
 
 export default function ProfileScreen() {
-  const p = usePalette();
-  const router = useRouter();
-  const { session, signOut } = useSession();
-  const userId = session?.userId;
+	const p = usePalette();
+	const router = useRouter();
+	const { session, signOut } = useSession();
+	const userId = session?.userId;
 
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
+	const [profile, setProfile] = useState<ProfileData | null>(null);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!userId) { setLoading(false); return; }
-    apiFetch<ProfileData>('/profile', { userId })
-      .then(setProfile)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [userId]);
+	useEffect(() => {
+		if (!userId) {
+			setLoading(false);
+			setProfile(null);
+			return;
+		}
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace('/login');
-  };
+		setLoading(true);
+		setError('');
 
-  const stats = profile
-    ? [
-        { icon: '🎰', label: 'Total Plays', value: String(profile.totalPlays)  },
-        { icon: '🏆', label: 'Prizes Won',  value: String(profile.prizesWon)   },
-        { icon: '⭐', label: 'Best Match',  value: `${profile.bestMatch} / 6`  },
-        { icon: '📊', label: 'Win Rate',    value: profile.winRate              },
-      ]
-    : [];
+		apiFetch<ProfileData>('/profile', { userId })
+			.then((data) => setProfile(data))
+			.catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load profile.'))
+			.finally(() => setLoading(false));
+	}, [userId]);
 
-  const luckyNumbers = profile?.luckyNumbers ?? [7, 14, 22, 33, 40, 49];
-  const initial = (profile?.displayName ?? 'P')[0].toUpperCase();
+	const stats = useMemo(
+		() => [
+			{ label: 'Total Plays', value: String(profile?.totalPlays ?? 0) },
+			{ label: 'Prizes Won', value: String(profile?.prizesWon ?? 0) },
+			{ label: 'Best Match', value: `${profile?.bestMatch ?? 0}/6` },
+			{ label: 'Win Rate', value: profile?.winRate ?? '0%' },
+		],
+		[profile]
+	);
 
-  return (
-    <SafeAreaView style={[s.root, { backgroundColor: p.screenBg }]}>
-      <View style={[s.orbTop,    { backgroundColor: p.orbOne }]} />
-      <View style={[s.orbBottom, { backgroundColor: p.orbTwo }]} />
+	const handleSignOut = async () => {
+		await signOut();
+		router.replace('/login');
+	};
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+	if (!session) {
+		return (
+			<SafeAreaView style={[s.root, { backgroundColor: p.screenBg }]}> 
+				<View style={[s.orbTop, { backgroundColor: p.orbOne }]} />
+				<View style={[s.orbBottom, { backgroundColor: p.orbTwo }]} />
 
-        <View style={[s.hero, { backgroundColor: p.heroBg }]}>
-          <Text style={[s.heroTag, { color: 'rgba(255,255,255,0.70)' }]}>PCSO LOTTO SIMULATOR</Text>
+				<View style={[s.guestCard, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}> 
+					<Ionicons name="person-circle-outline" size={52} color={p.textSoft} />
+					<Text style={[s.guestTitle, { color: p.textStrong }]}>Guest Explore Mode</Text>
+					<Text style={[s.guestSub, { color: p.textSoft }]}>Reconnect and sign in to access your full profile and wallet actions.</Text>
+				</View>
+			</SafeAreaView>
+		);
+	}
 
-          {loading ? (
-            <ActivityIndicator color={p.accent} style={{ marginTop: 16 }} />
-          ) : (
-            <>
-              <View style={s.avatarRow}>
-                <View style={[s.avatar, { backgroundColor: p.accent }]}>
-                  <Text style={[s.avatarInitial, { color: p.accentText }]}>{initial}</Text>
-                </View>
-                <View>
-                  <Text style={[s.playerName,  { color: '#ffffff' }]}>{profile?.displayName ?? 'Player'}</Text>
-                  <Text style={[s.memberSince, { color: 'rgba(255,255,255,0.70)' }]}>{profile?.memberSince ?? ''}</Text>
-                </View>
-              </View>
+	const name = profile?.displayName ?? session.displayName ?? 'Player';
+	const luckyNumbers = profile?.luckyNumbers ?? [];
 
-              {profile && (
-                <View style={[s.balanceRow, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                  <Text style={[s.balanceLabel, { color: 'rgba(255,255,255,0.70)' }]}>Demo Balance</Text>
-                  <Text style={[s.balanceValue, { color: p.accent }]}>{formatPHP(profile.balance)}</Text>
-                </View>
-              )}
+	return (
+		<SafeAreaView style={[s.root, { backgroundColor: p.screenBg }]}> 
+			<View style={[s.orbTop, { backgroundColor: p.orbOne }]} />
+			<View style={[s.orbBottom, { backgroundColor: p.orbTwo }]} />
 
-              <View style={s.statsRow}>
-                {stats.map(({ icon, label, value }) => (
-                  <View key={label} style={[s.stat, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                    <Text style={s.statIcon}>{icon}</Text>
-                    <Text style={[s.statValue, { color: p.accent }]}>{value}</Text>
-                    <Text style={[s.statLabel, { color: 'rgba(255,255,255,0.70)' }]}>{label}</Text>
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
-        </View>
+			<ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+				<View style={[s.hero, { backgroundColor: p.heroBg }]}> 
+					<Text style={[s.heroTag, { color: 'rgba(255,255,255,0.72)' }]}>LOTTO SIMULATOR</Text>
+					<Text style={[s.heroTitle, { color: '#ffffff' }]}>{name}</Text>
+					<Text style={[s.heroSub, { color: 'rgba(255,255,255,0.72)' }]}>{profile?.memberSince ?? 'Member'}</Text>
 
-        <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: p.textStrong }]}>Your Lucky Numbers</Text>
-          <View style={s.luckyRow}>
-            {luckyNumbers.map((n) => (
-              <View key={n} style={[s.luckyBall, { backgroundColor: p.secondaryButton }]}>
-                <Text style={[s.luckyBallText, { color: p.secondaryButtonText }]}>{n}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
+					<View style={[s.balanceChip, { backgroundColor: 'rgba(255,255,255,0.14)' }]}> 
+						<Text style={[s.balanceLabel, { color: 'rgba(255,255,255,0.72)' }]}>Balance</Text>
+						<Text style={[s.balanceValue, { color: p.accent }]}>{formatPHP(profile?.balance ?? 0)}</Text>
+					</View>
+				</View>
 
-        <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: p.textStrong }]}>Settings</Text>
-          {session?.role === 'admin' && (
-            <>
-              <Pressable style={s.settingsRow} onPress={() => router.push('/admin')}>
-                <View style={[s.settingsIconWrap, { backgroundColor: p.accent }]}>
-                  <Ionicons name="shield-checkmark-outline" size={16} color={p.accentText} />
-                </View>
-                <Text style={[s.settingsLabel, { color: p.textStrong }]}>Admin Panel</Text>
-                <Ionicons name="chevron-forward" size={16} color={p.textSoft} />
-              </Pressable>
-              <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
-            </>
-          )}
-          {SETTINGS.map(({ icon, label }, i) => (
-            <View key={label}>
-              <Pressable style={s.settingsRow}>
-                <View style={[s.settingsIconWrap, { backgroundColor: p.chipIdle }]}>
-                  <Ionicons name={icon} size={16} color={p.chipIdleText} />
-                </View>
-                <Text style={[s.settingsLabel, { color: p.textStrong }]}>{label}</Text>
-                <Ionicons name="chevron-forward" size={16} color={p.textSoft} />
-              </Pressable>
-              {i < SETTINGS.length - 1 && (
-                <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
-              )}
-            </View>
-          ))}
-          <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
-          <Pressable style={s.settingsRow} onPress={handleSignOut}>
-            <View style={[s.settingsIconWrap, { backgroundColor: '#fee2e2' }]}>
-              <Ionicons name="exit-outline" size={16} color="#dc2626" />
-            </View>
-            <Text style={[s.settingsLabel, { color: '#dc2626' }]}>Sign Out</Text>
-            <Ionicons name="chevron-forward" size={16} color="#dc2626" />
-          </Pressable>
-        </View>
+				{loading && <ActivityIndicator color={p.accent} style={{ marginTop: 16 }} />}
+				{!loading && !!error && <Text style={[s.errorText, { color: p.warning }]}>{error}</Text>}
 
-        <View style={{ height: 110 }} />
-      </ScrollView>
-    </SafeAreaView>
-  );
+				{!loading && (
+					<>
+						<View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}> 
+							<Text style={[s.sectionTitle, { color: p.textStrong }]}>Stats</Text>
+							<View style={s.statsRow}>
+								{stats.map((item) => (
+									<View key={item.label} style={[s.statTile, { backgroundColor: p.stageBg }]}> 
+										<Text style={[s.statLabel, { color: p.textSoft }]}>{item.label}</Text>
+										<Text style={[s.statValue, { color: p.textStrong }]}>{item.value}</Text>
+									</View>
+								))}
+							</View>
+						</View>
+
+						<View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}> 
+							<Text style={[s.sectionTitle, { color: p.textStrong }]}>Actions</Text>
+							<View style={s.actionsRow}>
+								<Pressable style={[s.actionBtn, { backgroundColor: p.chipIdle }]} onPress={() => router.push('/deposit')}>
+									<Ionicons name="arrow-down-circle-outline" size={16} color={p.chipIdleText} />
+									<Text style={[s.actionText, { color: p.chipIdleText }]}>Deposit</Text>
+								</Pressable>
+								<Pressable style={[s.actionBtn, { backgroundColor: p.chipIdle }]} onPress={() => router.push('/withdraw')}>
+									<Ionicons name="arrow-up-circle-outline" size={16} color={p.chipIdleText} />
+									<Text style={[s.actionText, { color: p.chipIdleText }]}>Withdraw</Text>
+								</Pressable>
+							</View>
+
+							<Pressable style={[s.fullAction, { backgroundColor: p.stageBg, borderColor: p.cardBorder }]} onPress={() => router.push('/funding-history')}>
+								<Ionicons name="receipt-outline" size={16} color={p.textStrong} />
+								<Text style={[s.fullActionText, { color: p.textStrong }]}>View Funding History</Text>
+								<Ionicons name="chevron-forward" size={16} color={p.textSoft} />
+							</Pressable>
+
+							{session.role === 'admin' && (
+								<Pressable style={[s.fullAction, { backgroundColor: p.stageBg, borderColor: p.cardBorder }]} onPress={() => router.push('/admin')}>
+									<Ionicons name="shield-checkmark-outline" size={16} color={p.textStrong} />
+									<Text style={[s.fullActionText, { color: p.textStrong }]}>Open Admin Panel</Text>
+									<Ionicons name="chevron-forward" size={16} color={p.textSoft} />
+								</Pressable>
+							)}
+						</View>
+
+						<View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}> 
+							<Text style={[s.sectionTitle, { color: p.textStrong }]}>Lucky Numbers</Text>
+							<View style={s.luckyRow}>
+								{luckyNumbers.length > 0 ? (
+									luckyNumbers.map((n, idx) => (
+										<View key={`${n}-${idx}`} style={[s.ball, { backgroundColor: p.secondaryButton }]}> 
+											<Text style={[s.ballText, { color: p.secondaryButtonText }]}>{n}</Text>
+										</View>
+									))
+								) : (
+									<Text style={[s.emptyLuckyText, { color: p.textSoft }]}>No lucky number data yet.</Text>
+								)}
+							</View>
+						</View>
+
+						<Pressable style={[s.signOutBtn, { backgroundColor: '#dc2626' }]} onPress={handleSignOut}>
+							<Ionicons name="exit-outline" size={16} color="#ffffff" />
+							<Text style={s.signOutText}>Sign Out</Text>
+						</Pressable>
+					</>
+				)}
+
+				<View style={{ height: 110 }} />
+			</ScrollView>
+		</SafeAreaView>
+	);
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1 },
-  orbTop:    { position: 'absolute', width: 280, height: 280, borderRadius: 140, top: -80,   right: -85,   opacity: 0.55 },
-  orbBottom: { position: 'absolute', width: 320, height: 320, borderRadius: 160, left: -130, bottom: -130, opacity: 0.42 },
-  scroll: { padding: 16, gap: 14 },
-  hero:    { borderRadius: 18, padding: 16 },
-  heroTag: { fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', fontFamily: Fonts.mono, marginBottom: 14 },
-  avatarRow:     { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 12 },
-  avatar:        { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontSize: 26, fontWeight: '800', fontFamily: Fonts.rounded },
-  playerName:    { fontSize: 20, fontWeight: '800', fontFamily: Fonts.rounded },
-  memberSince:   { fontSize: 12, fontWeight: '500', marginTop: 2, fontFamily: Fonts.sans },
-  balanceRow:    { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
-  balanceLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: Fonts.mono },
-  balanceValue:  { fontSize: 22, fontWeight: '800', fontFamily: Fonts.rounded, marginTop: 4 },
-  statsRow: { flexDirection: 'row', gap: 8 },
-  stat:     { flex: 1, borderRadius: 12, padding: 10, alignItems: 'center' },
-  statIcon: { fontSize: 18, marginBottom: 4 },
-  statValue:{ fontSize: 15, fontWeight: '800', fontFamily: Fonts.rounded },
-  statLabel:{ fontSize: 10, fontWeight: '600', marginTop: 2, fontFamily: Fonts.sans },
-  card:         { borderRadius: 16, borderWidth: 1, padding: 14 },
-  sectionTitle: { fontSize: 16, fontWeight: '800', fontFamily: Fonts.rounded, marginBottom: 14 },
-  luckyRow:     { flexDirection: 'row', justifyContent: 'space-between' },
-  luckyBall:    { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
-  luckyBallText:{ fontSize: 13, fontWeight: '700', fontFamily: Fonts.mono },
-  settingsRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-  settingsIconWrap:{ width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  settingsLabel:   { flex: 1, fontSize: 14, fontWeight: '600', fontFamily: Fonts.sans },
-  divider:         { height: StyleSheet.hairlineWidth, marginLeft: 44 },
+	root: { flex: 1 },
+	orbTop: { position: 'absolute', width: 280, height: 280, borderRadius: 140, top: -80, right: -85, opacity: 0.55 },
+	orbBottom: { position: 'absolute', width: 320, height: 320, borderRadius: 160, left: -130, bottom: -130, opacity: 0.42 },
+	scroll: { padding: 16, gap: 14 },
+	hero: { borderRadius: 18, padding: 16 },
+	heroTag: { fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', fontFamily: Fonts.mono },
+	heroTitle: { marginTop: 4, fontSize: 26, fontWeight: '800', fontFamily: Fonts.rounded },
+	heroSub: { marginTop: 4, fontSize: 13, fontWeight: '500', fontFamily: Fonts.sans },
+	balanceChip: { marginTop: 12, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
+	balanceLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: Fonts.mono },
+	balanceValue: { marginTop: 4, fontSize: 19, fontWeight: '800', fontFamily: Fonts.rounded },
+	card: { borderRadius: 16, borderWidth: 1, padding: 14 },
+	sectionTitle: { fontSize: 16, fontWeight: '800', fontFamily: Fonts.rounded, marginBottom: 12 },
+	statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+	statTile: { width: '48%', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 10 },
+	statLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: Fonts.mono },
+	statValue: { marginTop: 4, fontSize: 15, fontWeight: '800', fontFamily: Fonts.rounded },
+	actionsRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+	actionBtn: { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', gap: 4 },
+	actionText: { fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono },
+	fullAction: {
+		borderRadius: 12,
+		borderWidth: 1,
+		paddingHorizontal: 12,
+		paddingVertical: 11,
+		alignItems: 'center',
+		flexDirection: 'row',
+		gap: 8,
+		marginTop: 8,
+	},
+	fullActionText: { flex: 1, fontSize: 13, fontWeight: '700', fontFamily: Fonts.sans },
+	luckyRow: { flexDirection: 'row', gap: 7, flexWrap: 'wrap' },
+	ball: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+	ballText: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.mono },
+	emptyLuckyText: { fontSize: 13, fontFamily: Fonts.sans },
+	errorText: { textAlign: 'center', fontSize: 13, fontFamily: Fonts.sans, marginTop: 14 },
+	signOutBtn: {
+		marginTop: 4,
+		borderRadius: 14,
+		paddingVertical: 14,
+		alignItems: 'center',
+		justifyContent: 'center',
+		flexDirection: 'row',
+		gap: 8,
+	},
+	signOutText: { color: '#ffffff', fontSize: 14, fontWeight: '800', fontFamily: Fonts.mono },
+	guestCard: {
+		margin: 16,
+		marginTop: 30,
+		borderRadius: 16,
+		borderWidth: 1,
+		padding: 18,
+		alignItems: 'center',
+	},
+	guestTitle: { fontSize: 18, fontWeight: '800', fontFamily: Fonts.rounded, marginTop: 8 },
+	guestSub: { marginTop: 8, textAlign: 'center', fontSize: 13, lineHeight: 19, fontFamily: Fonts.sans },
 });
+

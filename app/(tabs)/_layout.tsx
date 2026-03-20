@@ -36,18 +36,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="tickets"
         options={{
-          title: 'Tickets',
+          title: 'My Bets',
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="ticket.fill" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'History',
-          tabBarIcon: ({ color, size }) => (
-            <IconSymbol size={size} name="clock.fill" color={color} />
           ),
         }}
       />
