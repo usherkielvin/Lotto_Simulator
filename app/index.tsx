@@ -153,7 +153,7 @@ export default function LoginScreen() {
       role: session.role,
       demo: session.demo,
     });
-    router.replace('/(tabs)');
+    router.replace('/(tabs)' as never);
   };
 
   const onLogin = async () => {

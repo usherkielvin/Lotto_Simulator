@@ -2,18 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -234,10 +234,7 @@ export default function AdminScreen() {
   const [message, setMessage] = useState('');
   const [showGamePicker, setShowGamePicker] = useState(false);
 
-  // Manual import modal
-  const [importVisible, setImportVisible] = useState(false);
-  const [manualData, setManualData] = useState('');
-  const [importing, setImporting] = useState(false);
+
 
   const formScrollRef = useRef<ScrollView>(null);
   const drawDateKey = [
@@ -329,22 +326,7 @@ export default function AdminScreen() {
     } finally { setSaving(false); }
   };
 
-  const handleImport = async () => {
-    if (!manualData.trim()) return;
-    setImporting(true);
-    try {
-      const res = await apiFetch<{ updatedCount: number }>('/admin/import-manual', {
-        method: 'POST', userId: session!.userId,
-        body: { rawData: manualData },
-      });
-      Alert.alert('Import Done', `Added ${res.updatedCount} new result(s).`);
-      setImportVisible(false);
-      setManualData('');
-      fetchResults();
-    } catch (e: unknown) {
-      Alert.alert('Import Failed', e instanceof Error ? e.message : 'Unknown error');
-    } finally { setImporting(false); }
-  };
+
 
   const handleDelete = (id: number) => {
     Alert.alert('Delete Result', 'Are you sure?', [

@@ -42,19 +42,19 @@ function RootLayoutNav() {
     const onAuthRoute = pathname === '/' || pathname === '/login';
 
     if (session && onAuthRoute && !inTabs) {
-      router.replace('/(tabs)');
+      router.replace('/(tabs)' as never);
       return;
     }
 
     if (canBrowseOffline) {
       if (!inTabs) {
-        router.replace('/(tabs)');
+        router.replace('/(tabs)' as never);
       }
       return;
     }
 
     if (!session && pathname !== '/login') {
-      router.replace('/login');
+      router.replace('/login' as never);
     }
   }, [session, loading, segments, pathname, router, canBrowseOffline]);
 

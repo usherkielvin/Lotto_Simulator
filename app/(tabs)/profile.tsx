@@ -30,9 +30,9 @@ type UnclaimedWin = {
   officialNumbers?: number[] | null;
 };
 
-type SettingsRoute = '/settings-theme' | '/settings-notifications' | '/funding-history' | '/settings-privacy' | '/settings-help';
+type SettingsRoute = '/settings-theme' | '/settings-notifications' | '/payouts' | '/funding-history' | '/settings-privacy' | '/settings-help';
 
-const PLAYER_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: string }[] = [
+const PLAYER_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: SettingsRoute }[] = [
   { icon: 'color-palette-outline', label: 'App theme',          route: '/settings-theme' },
   { icon: 'notifications-outline', label: 'Draw notifications', route: '/settings-notifications' },
   { icon: 'wallet-outline',        label: 'Payouts & History',   route: '/payouts' },
@@ -41,7 +41,7 @@ const PLAYER_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; ro
   { icon: 'help-circle-outline',   label: 'Help & support',     route: '/settings-help' },
 ];
 
-const ADMIN_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: string }[] = [
+const ADMIN_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: SettingsRoute }[] = [
   { icon: 'color-palette-outline', label: 'App theme',    route: '/settings-theme' },
   { icon: 'wallet-outline',        label: 'Payouts & History', route: '/payouts' },
   { icon: 'lock-closed-outline',   label: 'Privacy & data', route: '/settings-privacy' },
@@ -146,8 +146,9 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
+    await apiFetch('/auth/logout', { method: 'POST' });
     await signOut();
-    router.replace('/');
+    router.replace('/' as never);
   };
 
   if (!session) {
@@ -196,6 +197,11 @@ export default function ProfileScreen() {
                       </View>
                     )}
                   </View>
+                  {!isAdmin && (
+                    <Text style={[s.memberSince, { color: 'rgba(255,255,255,0.65)' }]}>
+                      Member since {profile?.memberSince || 'March 20, 2026'}
+                    </Text>
+                  )}
                 </View>
               </View>
 
@@ -206,11 +212,11 @@ export default function ProfileScreen() {
                   <Text style={[s.balanceValue, { color: p.accent }]}>{displayedBalance !== null ? formatPHP(displayedBalance) : 'Unavailable'}</Text>
                   <View style={[s.balanceDivider, { backgroundColor: 'rgba(255,255,255,0.22)' }]} />
                   <View style={s.balanceActionsRow}>
-                    <Pressable style={[s.balanceActionBtn, { borderColor: 'rgba(255,255,255,0.32)' }]} onPress={() => router.push('/deposit')}>
+                    <Pressable style={[s.balanceActionBtn, { borderColor: 'rgba(255,255,255,0.32)' }]} onPress={() => router.push('/deposit' as never)}>
                       <Ionicons name="arrow-down-circle-outline" size={16} color="#ffffff" />
                       <Text style={[s.balanceActionText, { color: '#ffffff' }]}>Deposit</Text>
                     </Pressable>
-                    <Pressable style={[s.balanceActionBtn, { borderColor: 'rgba(255,255,255,0.32)' }]} onPress={() => router.push('/withdraw')}>
+                    <Pressable style={[s.balanceActionBtn, { borderColor: 'rgba(255,255,255,0.32)' }]} onPress={() => router.push('/withdraw' as never)}>
                       <Ionicons name="arrow-up-circle-outline" size={16} color="#ffffff" />
                       <Text style={[s.balanceActionText, { color: '#ffffff' }]}>Withdraw</Text>
                     </Pressable>
@@ -337,7 +343,7 @@ export default function ProfileScreen() {
           <Text style={[s.sectionTitle, { color: p.textStrong }]}>Settings</Text>
           {settings.map(({ icon, label, route }, i) => (
             <View key={label}>
-              <SettingsRow icon={icon} label={label} onPress={() => router.push(route)} p={p} />
+              <SettingsRow icon={icon} label={label} onPress={() => router.push(route as never)} p={p} />
               {i < settings.length - 1 && <View style={[s.divider, { backgroundColor: p.cardBorder }]} />}
             </View>
           ))}
@@ -362,6 +368,7 @@ const s = StyleSheet.create({
   avatar:        { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontSize: 26, fontWeight: '800', fontFamily: Fonts.rounded },
   playerName:    { fontSize: 20, fontWeight: '800', fontFamily: Fonts.rounded },
+  memberSince:   { fontSize: 12, fontWeight: '500', fontFamily: Fonts.sans, marginTop: 2 },
   adminBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   adminBadgeText:{ fontSize: 11, fontWeight: '700', fontFamily: Fonts.mono },
   balanceRow:    { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
