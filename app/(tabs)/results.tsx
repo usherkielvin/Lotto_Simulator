@@ -88,10 +88,12 @@ function HistoryRow({ result, palette }: { result: DrawResult; palette: ReturnTy
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={[s.jackpot, { color: p.accent }]}>{formatJackpot(result.jackpot)}</Text>
-          {result.winners > 0 && (
+          {result.winners > 0 ? (
             <View style={[s.winnersBadge, { backgroundColor: p.payout + '22' }]}>
               <Text style={[s.winnersText, { color: p.payout }]}>{result.winners} Winner{result.winners !== 1 ? 's' : ''}</Text>
             </View>
+          ) : (
+            <Text style={[s.noWinnerText, { color: p.textSoft }]}>No Jackpot Winner</Text>
           )}
         </View>
       </View>
@@ -351,6 +353,7 @@ const s = StyleSheet.create({
   drawMetaText:   { fontSize: 12, fontWeight: '600', fontFamily: Fonts.mono },
   winnersBadge:   { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 4 },
   winnersText:    { fontSize: 11, fontWeight: '700', fontFamily: Fonts.sans },
+  noWinnerText:   { fontSize: 11, fontWeight: '500', fontFamily: Fonts.sans, marginTop: 4 },
   ball:           { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   ballText:       { fontSize: 13, fontWeight: '800', fontFamily: Fonts.mono },
   // Empty state
