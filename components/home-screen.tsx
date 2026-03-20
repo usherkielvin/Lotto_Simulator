@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,6 +24,9 @@ type LottoGame = {
   name: string;
   maxNumber: number;
   drawTime: string;
+  drawDays: string;
+  jackpot: number;
+  jackpotStatus: string;
 };
 
 type Palette = {
@@ -72,18 +75,107 @@ function pickUniqueNumbers(max: number, count: number, rand: () => number = Math
   while (picked.size < count) picked.add(Math.floor(rand()*max)+1);
   return Array.from(picked).sort((a,b) => a-b);
 }
+
+function getGameType(gameId: string): '2number' | '3digit' | '4digit' | '6digit' | '6number' {
+  if (gameId === '2d-ez2') return '2number';
+  if (gameId === '3d-swertres') return '3digit';
+  if (gameId === '4digit') return '4digit';
+  if (gameId === '6digit') return '6digit';
+  return '6number';
+}
+
+function isDigitGame(gameType: '2number' | '3digit' | '4digit' | '6digit' | '6number'): boolean {
+  return gameType === '3digit' || gameType === '4digit' || gameType === '6digit';
+}
+
+function getRequiredDigits(gameType: '2number' | '3digit' | '4digit' | '6digit' | '6number'): number {
+  switch (gameType) {
+    case '2number': return 2;
+    case '3digit': return 3;
+    case '4digit': return 4;
+    case '6digit': return 6;
+    case '6number': return 6;
+  }
+}
+
 function buildOfficialNumbers(game: LottoGame, key: string) {
-  return pickUniqueNumbers(game.maxNumber, 6, seededRandom(`pcso:${game.id}:${key}`));
+  const gameType = getGameType(game.id);
+  const requiredCount = getRequiredDigits(gameType);
+  const isDigit = isDigitGame(gameType);
+
+  if (isDigit) {
+    // 3D, 4D, 6D: Generate random digits 0-9
+    const result = [];
+    const rand = seededRandom(`pcso:${game.id}:${key}`);
+    for (let i = 0; i < requiredCount; i++) {
+      result.push(Math.floor(rand() * 10));
+    }
+    return result;
+  } else if (gameType === '2number') {
+    // 2D: Pick 2 numbers (can repeat) from 1 to maxNumber
+    const result = [];
+    const rand = seededRandom(`pcso:${game.id}:${key}`);
+    for (let i = 0; i < 2; i++) {
+      result.push(Math.floor(rand() * game.maxNumber) + 1);
+    }
+    return result;
+  } else {
+    // 6-number games: Pick 6 unique numbers
+    return pickUniqueNumbers(game.maxNumber, 6, seededRandom(`pcso:${game.id}:${key}`));
+  }
 }
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 }
 
+function isGameAvailableToday(game: LottoGame, now: Date): boolean {
+  if (!game.drawDays) return true;
+  
+  // Get day of week: 0 = Sunday, 1 = Monday, ... 6 = Saturday
+  const dayOfWeek = now.getDay();
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const currentDay = dayNames[dayOfWeek];
+  const currentDayNum = String(dayOfWeek);
+  
+  // Split drawDays by comma and check if current day is included
+  const availableDays = game.drawDays.split(',').map(d => d.trim());
+  
+  // Check if day name or day number matches
+  return availableDays.includes(currentDay) || availableDays.includes(currentDayNum) || availableDays.includes(String(dayOfWeek));
+}
+
 const MIN_STAKE = 20;
 const MAX_STAKE = 500;
 
+const SCREEN_W  = Dimensions.get('window').width;
+const SLIDE_GAP = 12;
+// Available width inside the card: screen - outer scroll padding (16*2) - card padding (14*2)
+const AVAIL_W   = SCREEN_W - 32 - 28; // = SCREEN_W - 60
+const SLIDE_W   = AVAIL_W - 24; // leaves ~12px peek on each side within the card
+const SNAP_INTERVAL = SLIDE_W + SLIDE_GAP;
+// padding so first card is centered within the available width
+const CAROUSEL_PADDING = (AVAIL_W - SLIDE_W) / 2;
+
+function getNextDrawDate(game: LottoGame, now: Date): string {
+  if (!game.drawDays) return '';
+  const drawDayNums = game.drawDays.split(',').map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n));
+  if (drawDayNums.length === 0) return '';
+  const today = now.getDay();
+  // Find the soonest future draw day
+  let minDiff = 8;
+  for (const d of drawDayNums) {
+    const diff = (d - today + 7) % 7 || 7; // never 0 since game isn't available today
+    if (diff < minDiff) minDiff = diff;
+  }
+  const next = new Date(now);
+  next.setDate(now.getDate() + minDiff);
+  return next.toLocaleDateString('en-PH', { weekday: 'long' });
+}
+
+const MAJOR_LOTTO_IDS = ['ultra-658', 'grand-655', 'super-649', 'mega-645', 'lotto-642'];
+const SMALL_GAME_IDS  = ['6digit', '4digit', '3d-swertres', '2d-ez2'];
+
 export default function HomeScreen() {
-  const router = useRouter();
   const { session } = useSession();
   const colorScheme = useColorScheme();
   const uid = session?.userId ?? null;
@@ -107,6 +199,11 @@ export default function HomeScreen() {
   const [placingBet, setPlacingBet] = useState(false);
 
   const boardPulse = useRef(new Animated.Value(1)).current;
+  const jackpotScroll = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const betBuilderRef = useRef<View>(null);
+  const [jackpotIndex, setJackpotIndex] = useState(0);
+  const dotAnim = useRef(new Animated.Value(0)).current;
 
   // Clock
   useEffect(() => {
@@ -114,12 +211,13 @@ export default function HomeScreen() {
     return () => clearInterval(t);
   }, []);
 
-  // Load games
+  // Load games — today only
   useEffect(() => {
     apiFetch<LottoGame[]>('/games')
       .then(data => {
         setGames(data);
-        if (data.length > 0) setSelectedGameId(data[0].id);
+        const firstMajor = data.find(g => MAJOR_LOTTO_IDS.includes(g.id));
+        setSelectedGameId(firstMajor?.id ?? data[0]?.id ?? '');
       })
       .catch(() => setNotice('Could not load games. Is the server running?'))
       .finally(() => setGamesLoading(false));
@@ -135,15 +233,67 @@ export default function HomeScreen() {
   }, [uid]);
 
   const selectedGame = useMemo(
-    () => games.find(g => g.id === selectedGameId) ?? games[0],
-    [games, selectedGameId],
+    () => games.find(g => g.id === selectedGameId && isGameAvailableToday(g, now)) ?? games.find(g => isGameAvailableToday(g, now)) ?? games[0],
+    [games, selectedGameId, now],
   );
 
+  const majorGames = useMemo(
+    () => MAJOR_LOTTO_IDS
+      .map(id => games.find(g => g.id === id))
+      .filter((g): g is LottoGame => g !== undefined)
+      .sort((a, b) => {
+        const aToday = isGameAvailableToday(a, now) ? 0 : 1;
+        const bToday = isGameAvailableToday(b, now) ? 0 : 1;
+        return aToday - bToday;
+      }),
+    [games, now],
+  );
+  const smallGames = useMemo(
+    () => SMALL_GAME_IDS
+      .map(id => games.find(g => g.id === id))
+      .filter((g): g is LottoGame => g !== undefined)
+      .sort((a, b) => {
+        const aToday = isGameAvailableToday(a, now) ? 0 : 1;
+        const bToday = isGameAvailableToday(b, now) ? 0 : 1;
+        return aToday - bToday;
+      }),
+    [games, now],
+  );
+
+  // All games for carousel — today's draws first, then off-day ones
+  const carouselGames = useMemo(() => {
+    const all = [...MAJOR_LOTTO_IDS, ...SMALL_GAME_IDS]
+      .map(id => games.find(g => g.id === id))
+      .filter((g): g is LottoGame => g !== undefined);
+    const today = all.filter(g => isGameAvailableToday(g, now));
+    const offDay = all.filter(g => !isGameAvailableToday(g, now));
+    return [...today, ...offDay];
+  }, [games, now]);
+
   const numberOptions = useMemo(
-    () => selectedGame ? Array.from({ length: selectedGame.maxNumber }, (_, i) => i+1) : [],
+    () => {
+      if (!selectedGame) return [];
+      const gameType = getGameType(selectedGame.id);
+      const isDigit = isDigitGame(gameType);
+      if (isDigit) {
+        // 3D, 4D, 6D: Show digits 0-9
+        return Array.from({ length: 10 }, (_, i) => i);
+      } else {
+        // 2D and 6-number games: Show range 1 to maxNumber
+        return Array.from({ length: selectedGame.maxNumber }, (_, i) => i+1);
+      }
+    },
     [selectedGame],
   );
 
+  // Auto-switch to available game if selected game is not available today
+  useEffect(() => {
+    if (selectedGame && selectedGameId && selectedGame.id !== selectedGameId) {
+      setSelectedGameId(selectedGame.id);
+    }
+  }, [selectedGame, selectedGameId]);
+
+  // Clear selected numbers when game changes
   useEffect(() => { setSelectedNumbers([]); }, [selectedGameId]);
 
   const nextDrawAt = getNextDrawAt(now);
@@ -186,7 +336,21 @@ export default function HomeScreen() {
 
   const createLuckyPick = () => {
     if (!selectedGame) return;
-    const nums = pickUniqueNumbers(selectedGame.maxNumber, 6);
+    const gameType = getGameType(selectedGame.id);
+    const requiredCount = getRequiredDigits(gameType);
+    const isDigit = isDigitGame(gameType);
+    let nums: number[] = [];
+
+    if (gameType === '6number') {
+      // 6-number games: 6 unique numbers
+      nums = pickUniqueNumbers(selectedGame.maxNumber, 6);
+    } else if (isDigit || gameType === '2number') {
+      // 2D, 3D, 4D, 6D: Random digits 0-9 (can repeat)
+      nums = [];
+      for (let i = 0; i < requiredCount; i++) {
+        nums.push(Math.floor(Math.random() * 10));
+      }
+    }
     setSelectedNumbers(nums);
     setNotice(`Lucky pick ready: ${nums.join(' - ')}`);
     triggerBoardPulse();
@@ -194,15 +358,37 @@ export default function HomeScreen() {
 
   const toggleManualNumber = (v: number) => {
     if (betMode !== 'manual') return;
+    const gameType = getGameType(selectedGame?.id || '');
+    const requiredCount = getRequiredDigits(gameType);
+    const allowsDuplicates = gameType !== '6number'; // 2D, 3D, 4D, 6D allow duplicates
+
     setSelectedNumbers(cur => {
-      if (cur.includes(v)) return cur.filter(n => n !== v);
-      if (cur.length >= 6) return cur;
-      return [...cur, v].sort((a,b) => a-b);
+      if (allowsDuplicates) {
+        // For 2D, 3D, 4D, 6D: Allow duplicates, just keep adding
+        if (cur.length >= requiredCount) return cur;
+        return [...cur, v];
+      } else {
+        // For 6-number games: No duplicates, toggle on/off
+        if (cur.includes(v)) return cur.filter(n => n !== v);
+        if (cur.length >= requiredCount) return cur;
+        return [...cur, v].sort((a,b) => a-b);
+      }
     });
   };
 
   const changeStake = (delta: number) => {
     setStake(cur => Math.min(MAX_STAKE, Math.max(MIN_STAKE, cur + delta)));
+  };
+
+  const selectGame = (id: string) => {
+    setSelectedGameId(id);
+    setTimeout(() => {
+      betBuilderRef.current?.measureLayout(
+        scrollViewRef.current as unknown as Parameters<typeof betBuilderRef.current.measureLayout>[0],
+        (_x, y) => { scrollViewRef.current?.scrollTo({ y, animated: true }); },
+        () => {},
+      );
+    }, 50);
   };
 
   const placeBet = async () => {
@@ -214,12 +400,28 @@ export default function HomeScreen() {
       return;
     }
 
-    const activeNumbers = betMode === 'lucky'
-      ? (selectedNumbers.length === 6 ? selectedNumbers : pickUniqueNumbers(selectedGame.maxNumber, 6))
-      : selectedNumbers;
+    const gameType = getGameType(selectedGame.id);
+    const requiredCount = getRequiredDigits(gameType);
+    const isDigit = isDigitGame(gameType);
 
-    if (activeNumbers.length !== 6) {
-      setNotice('Select exactly six numbers before placing your bet.');
+    let activeNumbers = selectedNumbers;
+    if (betMode === 'lucky') {
+      if (activeNumbers.length !== requiredCount) {
+        if (gameType === '6number') {
+          activeNumbers = pickUniqueNumbers(selectedGame.maxNumber, 6);
+        } else if (isDigit || gameType === '2number') {
+          // 2D, 3D, 4D, 6D: Random digits 0-9
+          activeNumbers = [];
+          for (let i = 0; i < requiredCount; i++) {
+            activeNumbers.push(Math.floor(Math.random() * 10));
+          }
+        }
+      }
+    }
+
+    if (activeNumbers.length !== requiredCount) {
+      const label = requiredCount === 1 ? 'number' : 'numbers';
+      setNotice(`Select exactly ${requiredCount} ${label} before placing your bet.`);
       return;
     }
     if (balance < stake) {
@@ -251,41 +453,209 @@ export default function HomeScreen() {
       <View style={[styles.orbTop,    { backgroundColor: palette.orbOne }]} />
       <View style={[styles.orbBottom, { backgroundColor: palette.orbTwo }]} />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View style={[styles.heroCard, { backgroundColor: palette.heroBg }]}>
-          <View style={styles.heroRow}>
-            <View>
-              <Text style={[styles.heroTag,      { color: 'rgba(255,255,255,0.70)' }]}>PCSO LOTTO SIMULATOR</Text>
-              <Text style={[styles.heroTitle,    { color: '#ffffff' }]}>{displayName}</Text>
-              <Text style={[styles.heroSubTitle, { color: 'rgba(255,255,255,0.70)' }]}>Daily 9:00 PM draw tracking</Text>
+          {/* Top row: greeting + demo badge */}
+          <View style={styles.heroTopRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.heroTag, { color: 'rgba(255,255,255,0.60)' }]}>PCSO LOTTO SIMULATOR</Text>
+              <Text style={[styles.heroTitle, { color: '#ffffff' }]}>Hi, {displayName}</Text>
             </View>
+            {isDemoUser && (
+              <View style={[styles.demoBadge, { backgroundColor: 'rgba(244,180,0,0.18)' }]}>
+                <Ionicons name="flask-outline" size={12} color={palette.accent} />
+                <Text style={[styles.demoBadgeText, { color: palette.accent }]}>Demo</Text>
+              </View>
+            )}
           </View>
 
+          {/* Divider */}
+          <View style={[styles.heroDivider, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
+
+          {/* Stats row */}
           <View style={styles.heroStatsRow}>
-            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-              <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.70)' }]}>Demo Balance</Text>
+            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
+              <Ionicons name="wallet-outline" size={14} color="rgba(255,255,255,0.55)" />
+              <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.55)', marginTop: 6 }]}>Balance</Text>
               {balanceLoading
-                ? <ActivityIndicator color={palette.accent} style={{ marginTop: 5 }} />
+                ? <ActivityIndicator color={palette.accent} size="small" style={{ marginTop: 4 }} />
                 : <Text style={[styles.heroStatValue, { color: palette.accent }]}>{formatCurrency(balance)}</Text>
               }
             </View>
-            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-              <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.70)' }]}>Next Draw</Text>
-              <Text style={[styles.heroStatValue, { color: palette.accent }]}>{countdownLabel}</Text>
+            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
+              <Ionicons name="timer-outline" size={14} color="rgba(255,255,255,0.55)" />
+              <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.55)', marginTop: 6 }]}>Next Draw</Text>
+              <Text style={[styles.heroStatValue, { color: '#ffffff' }]}>{countdownLabel}</Text>
+            </View>
+            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
+              <Ionicons name="calendar-outline" size={14} color="rgba(255,255,255,0.55)" />
+              <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.55)', marginTop: 6 }]}>Draw Date</Text>
+              <Text style={[styles.heroStatValue, { color: '#ffffff', fontSize: 12 }]}>
+                {nextDrawAt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+              </Text>
             </View>
           </View>
 
-          <Text style={[styles.drawMeta,   { color: 'rgba(255,255,255,0.70)' }]}>Draw lock: {nextDrawLabel}</Text>
-          <Text style={[styles.drawSource, { color: 'rgba(255,255,255,0.70)' }]}>Result basis: official 9:00 PM schedule.</Text>
-
-          {isDemoUser && (
-            <View style={[styles.demoBadge, { backgroundColor: palette.accent }]}>
-              <Ionicons name="person-circle-outline" size={14} color={palette.accentText} />
-              <Text style={[styles.demoBadgeText, { color: palette.accentText }]}>Demo Account Active</Text>
-            </View>
-          )}
+          {/* Draw lock note */}
+          <View style={styles.heroFootRow}>
+            <Ionicons name="lock-closed-outline" size={11} color="rgba(255,255,255,0.45)" />
+            <Text style={[styles.heroFootText, { color: 'rgba(255,255,255,0.45)' }]}>
+              Locks at {nextDrawAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })} · {nextDrawAt.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}
+            </Text>
+          </View>
         </View>
+
+        {/* Jackpot Showcase */}
+        {!gamesLoading && majorGames.length > 0 && (
+          <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+            {/* Header */}
+            <View style={styles.jackpotHeader}>
+              <View>
+                <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Tonight's Jackpots</Text>
+                <Text style={[styles.jackpotSubtitle, { color: palette.textSoft }]}>
+                  {now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+                </Text>
+              </View>
+              <View style={[styles.jackpotDrawBadge, { backgroundColor: palette.chipIdle }]}>
+                <Ionicons name="time-outline" size={11} color={palette.chipIdleText} />
+                <Text style={[styles.jackpotDrawBadgeText, { color: palette.chipIdleText }]}>9:00 PM</Text>
+              </View>
+            </View>
+
+            {/* Carousel */}
+            <ScrollView
+              ref={jackpotScroll}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={SNAP_INTERVAL}
+              decelerationRate="fast"
+              scrollEventThrottle={16}
+              onScroll={e => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / SNAP_INTERVAL);
+                const clamped = Math.max(0, Math.min(idx, majorGames.length - 1));
+                if (clamped !== jackpotIndex) {
+                  setJackpotIndex(clamped);
+                  Animated.spring(dotAnim, { toValue: clamped, useNativeDriver: false, speed: 20, bounciness: 0 }).start();
+                }
+              }}
+              style={{ marginTop: 10 }}
+              contentContainerStyle={{ paddingHorizontal: CAROUSEL_PADDING }}
+            >
+              {majorGames.map((g, idx) => {
+                const availableToday = isGameAvailableToday(g, now);
+                const drawDayNames = g.drawDays
+                  ? g.drawDays.split(',').map(d => {
+                      const n = parseInt(d.trim(), 10);
+                      return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][n] ?? d.trim();
+                    }).join(' · ')
+                  : '';
+                return (
+                  <View
+                    key={g.id}
+                    style={[
+                      styles.jackpotSlide,
+                      {
+                        backgroundColor: palette.stageBg,
+                        borderColor: palette.cardBorder,
+                        borderWidth: 1,
+                        opacity: availableToday ? 1 : 0.45,
+                      },
+                    ]}
+                  >
+                    {/* Game name + today badge */}
+                    <View style={styles.jackpotSlideTop}>
+                      <Text style={[styles.jackpotGameName, { color: palette.textSoft }]}>
+                        {g.name}
+                      </Text>
+                      {availableToday && (
+                        <View style={[styles.jackpotActivePill, { backgroundColor: palette.accent }]}>
+                          <Text style={[styles.jackpotActivePillText, { color: palette.accentText }]}>Today</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Jackpot amount */}
+                    <Text style={[styles.jackpotAmount, { color: palette.accent }]}>
+                      {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(g.jackpot)}
+                    </Text>
+                    <Text style={[styles.jackpotLabel, { color: palette.textSoft }]}>
+                      Estimated Jackpot Prize
+                    </Text>
+
+                    {/* Divider */}
+                    <View style={[styles.jackpotSlideDivider, { backgroundColor: palette.cardBorder }]} />
+
+                    {/* Details row */}
+                    <View style={styles.jackpotDetailsRow}>
+                      <View style={styles.jackpotDetailItem}>
+                        <Ionicons name="calendar-outline" size={12} color={palette.textSoft} />
+                        <Text style={[styles.jackpotDetailText, { color: palette.textSoft }]}>
+                          {drawDayNames}
+                        </Text>
+                      </View>
+                      <View style={styles.jackpotDetailItem}>
+                        <Ionicons name="grid-outline" size={12} color={palette.textSoft} />
+                        <Text style={[styles.jackpotDetailText, { color: palette.textSoft }]}>
+                          Pick 6 of {g.maxNumber}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Status */}
+                    <Text style={[styles.jackpotStatus, { color: palette.warning }]} numberOfLines={1}>
+                      {g.jackpotStatus}
+                    </Text>
+
+                    {/* Buy Tickets / Next draw */}
+                    {availableToday ? (
+                      <Pressable
+                        onPress={() => selectGame(g.id)}
+                        style={[styles.jackpotBetBtn, { backgroundColor: palette.accent }]}
+                      >
+                        <Ionicons name="ticket-outline" size={13} color={palette.accentText} />
+                        <Text style={[styles.jackpotBetBtnText, { color: palette.accentText }]}>
+                          Buy Tickets
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <View style={[styles.jackpotBetBtn, { backgroundColor: palette.chipIdle }]}>
+                        <Ionicons name="time-outline" size={13} color={palette.chipIdleText} />
+                        <Text style={[styles.jackpotBetBtnText, { color: palette.chipIdleText }]}>
+                          Draws {drawDayNames.split(' · ')[0]}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            {/* Dot indicators */}
+            {majorGames.length > 1 && (
+              <View style={styles.dotRow}>
+                {majorGames.map((_, i) => {
+                  const width = dotAnim.interpolate({
+                    inputRange: majorGames.map((__, j) => j),
+                    outputRange: majorGames.map((__, j) => (j === i ? 18 : 7)),
+                    extrapolate: 'clamp',
+                  });
+                  const opacity = dotAnim.interpolate({
+                    inputRange: majorGames.map((__, j) => j),
+                    outputRange: majorGames.map((__, j) => (j === i ? 1 : 0.35)),
+                    extrapolate: 'clamp',
+                  });
+                  return (
+                    <Animated.View
+                      key={i}
+                      style={[styles.dot, { backgroundColor: palette.accent, width, opacity }]}
+                    />
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Game Picker */}
         <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
@@ -293,24 +663,50 @@ export default function HomeScreen() {
           {gamesLoading
             ? <ActivityIndicator color={palette.accent} style={{ marginTop: 12 }} />
             : (
-              <View style={styles.gameGrid}>
-                {games.map((game) => {
-                  const active = game.id === selectedGame?.id;
-                  return (
-                    <Pressable key={game.id} onPress={() => setSelectedGameId(game.id)}
-                      style={[styles.gameChip, { backgroundColor: active ? palette.chipActive : palette.chipIdle }]}>
-                      <Text style={[styles.gameChipLabel, { color: active ? palette.chipActiveText : palette.chipIdleText }]}>{game.name}</Text>
-                      <Text style={[styles.gameChipSub,   { color: active ? palette.chipActiveText : palette.chipIdleText }]}>{game.drawTime}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <>
+                <View style={styles.categorySection}>
+                  <Text style={[styles.categoryLabel, { color: palette.textSoft }]}>Major Lotto Games</Text>
+                  <View style={styles.gameGrid}>
+                    {majorGames.map((game) => {
+                      const active = game.id === selectedGame?.id;
+                      const available = isGameAvailableToday(game, now);
+                      return (
+                        <Pressable key={game.id} onPress={() => available && selectGame(game.id)} disabled={!available}
+                          style={[styles.gameChip, { backgroundColor: active ? palette.chipActive : palette.chipIdle, opacity: available ? 1 : 0.4 }]}>
+                          <Text style={[styles.gameChipLabel, { color: active ? palette.chipActiveText : palette.chipIdleText }]}>{game.name}</Text>
+                          <Text style={[styles.gameChipSub, { color: active ? palette.chipActiveText : palette.chipIdleText }]}>
+                            {available ? game.drawTime : getNextDrawDate(game, now)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+                <View style={[styles.categorySection, { marginTop: 10 }]}>
+                  <Text style={[styles.categoryLabel, { color: palette.textSoft }]}>3D / 4D Games</Text>
+                  <View style={styles.gameGrid}>
+                    {smallGames.map((game) => {
+                      const active = game.id === selectedGame?.id;
+                      const available = isGameAvailableToday(game, now);
+                      return (
+                        <Pressable key={game.id} onPress={() => available && selectGame(game.id)} disabled={!available}
+                          style={[styles.gameChip, { backgroundColor: active ? palette.chipActive : palette.chipIdle, opacity: available ? 1 : 0.4 }]}>
+                          <Text style={[styles.gameChipLabel, { color: active ? palette.chipActiveText : palette.chipIdleText }]}>{game.name}</Text>
+                          <Text style={[styles.gameChipSub, { color: active ? palette.chipActiveText : palette.chipIdleText }]}>
+                            {available ? game.drawTime : getNextDrawDate(game, now)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              </>
             )
           }
         </View>
 
         {/* Bet Builder */}
-        <Animated.View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder, transform: [{ scale: boardPulse }] }]}>
+        <Animated.View ref={betBuilderRef} style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder, transform: [{ scale: boardPulse }] }]}>
           <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Build Your Bet Slip</Text>
 
           <View style={styles.modeRow}>
@@ -332,29 +728,189 @@ export default function HomeScreen() {
             </Pressable>
           )}
 
-          <View style={styles.selectionTray}>
-            {Array.from({ length: 6 }).map((_, i) => {
-              const v = selectedNumbers[i];
+          {selectedGame && (() => {
+            const gameType = getGameType(selectedGame.id);
+            const requiredCount = getRequiredDigits(gameType);
+            const isDigit = isDigitGame(gameType);
+            const is2D = gameType === '2number';
+            const is3D4D6D = isDigit;
+            const itemLabel = isDigit ? 'digit' : 'number';
+            
+            return (
+              <>
+                {is2D ? (
+                  <View>
+                    <View style={[styles.selectionTray, { marginBottom: 12 }]}>
+                      {Array.from({ length: 2 }).map((_, i) => (
+                        <View key={`selection-${i}`} style={[styles.selectionBall, { backgroundColor: selectedNumbers[i] !== undefined ? palette.stageBg : palette.cardBg, borderWidth: selectedNumbers[i] !== undefined ? 0 : 2, borderColor: palette.textSoft }]}>
+                          <Text style={[styles.selectionBallText, { color: selectedNumbers[i] !== undefined ? palette.textStrong : palette.textSoft }]}>
+                            {selectedNumbers[i] ?? '-'}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                    <Text style={[styles.selectionHint, { color: palette.textSoft }]}>
+                      Selected {selectedNumbers.length} of 2 digits
+                    </Text>
+                  </View>
+                ) : is3D4D6D ? (
+                  <View>
+                    <View style={[styles.selectionTray, { marginBottom: 12 }]}>
+                      {Array.from({ length: requiredCount }).map((_, i) => (
+                        <View key={`selection-${i}`} style={[styles.selectionBall, { backgroundColor: selectedNumbers[i] !== undefined ? palette.stageBg : palette.cardBg, borderWidth: selectedNumbers[i] !== undefined ? 0 : 2, borderColor: palette.textSoft }]}>
+                          <Text style={[styles.selectionBallText, { color: selectedNumbers[i] !== undefined ? palette.textStrong : palette.textSoft }]}>
+                            {selectedNumbers[i] ?? '-'}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                    <Text style={[styles.selectionHint, { color: palette.textSoft }]}>
+                      Selected {selectedNumbers.length} of {requiredCount} {requiredCount === 1 ? itemLabel : itemLabel + 's'}
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.selectionTray}>
+                      {Array.from({ length: requiredCount }).map((_, i) => {
+                        const v = selectedNumbers[i];
+                        return (
+                          <View key={`slot-${i}`} style={[styles.selectionBall, { backgroundColor: palette.stageBg }]}>
+                            <Text style={[styles.selectionBallText, { color: palette.textStrong }]}>{v ?? '--'}</Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                    <Text style={[styles.selectionHint, { color: palette.textSoft }]}>
+                      Selected {selectedNumbers.length} of {requiredCount} {requiredCount === 1 ? itemLabel : itemLabel + 's'}
+                    </Text>
+                  </>
+                )}
+              </>
+            );
+          })()}
+
+          {selectedGame && (() => {
+            const gameType = getGameType(selectedGame.id);
+            const is2D = gameType === '2number';
+            
+            if (is2D) {
+              // 2D special interface: Two columns like 3D/4D/6D
               return (
-                <View key={`slot-${i}`} style={[styles.selectionBall, { backgroundColor: palette.stageBg }]}>
-                  <Text style={[styles.selectionBallText, { color: palette.textStrong }]}>{v ?? '--'}</Text>
+                <View style={[styles.digitColumnsContainer, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+                  {Array.from({ length: 2 }).map((_, posIdx) => (
+                    <View key={`column-${posIdx}`} style={[styles.digitColumnCard, { borderRightColor: posIdx < 1 ? palette.cardBorder : 'transparent' }]}>
+                      <Text style={[styles.digitPositionLabel, { color: palette.accent }]}>
+                        {posIdx === 0 ? '①' : '②'}
+                      </Text>
+                      <View style={styles.digitColumn}>
+                        {Array.from({ length: 10 }, (_, i) => i).map((v) => {
+                          const chosen = selectedNumbers[posIdx] === v;
+                          return (
+                            <Pressable key={`digit${posIdx}-${v}`} onPress={() => {
+                              if (betMode === 'manual') {
+                                const updated = [...selectedNumbers];
+                                updated[posIdx] = v;
+                                setSelectedNumbers(updated.slice(0, 2));
+                              }
+                            }} disabled={betMode !== 'manual'}
+                              style={[styles.numberChip, { 
+                                backgroundColor: chosen ? palette.numberSelected : palette.numberIdle,
+                                opacity: betMode === 'manual' ? 1 : 0.45,
+                              }]}>
+                              <Text style={[styles.numberChipText, { color: chosen ? palette.numberSelectedText : palette.numberIdleText }]}>
+                                {v}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))}
                 </View>
               );
-            })}
-          </View>
-          <Text style={[styles.selectionHint, { color: palette.textSoft }]}>Selected {selectedNumbers.length} of 6 numbers</Text>
+            }
 
-          <View style={styles.numberGrid}>
-            {numberOptions.map((v) => {
-              const chosen = selectedBallSet.has(v);
+            // For other games: standard grid or columns for 3D/4D/6D digits
+            const isDigit = isDigitGame(gameType);
+            const allowsDuplicates = gameType !== '6number';
+            const requiredDigits = getRequiredDigits(gameType);
+            
+            // For 3D/4D/6D: create separate columns for each digit position
+            if (isDigit) {
               return (
-                <Pressable key={`num-${v}`} onPress={() => toggleManualNumber(v)} disabled={betMode !== 'manual'}
-                  style={[styles.numberChip, { backgroundColor: chosen ? palette.numberSelected : palette.numberIdle, opacity: betMode === 'manual' ? 1 : 0.45 }]}>
-                  <Text style={[styles.numberChipText, { color: chosen ? palette.numberSelectedText : palette.numberIdleText }]}>{v}</Text>
-                </Pressable>
+                <View style={[styles.digitColumnsContainer, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+                  {Array.from({ length: requiredDigits }).map((_, posIdx) => (
+                    <View key={`column-${posIdx}`} style={[styles.digitColumnCard, { borderRightColor: posIdx < requiredDigits - 1 ? palette.cardBorder : 'transparent' }]}>
+                      <Text style={[styles.digitPositionLabel, { color: palette.accent }]}>
+                        {gameType === '3digit' && ['①', '②', '③'][posIdx]}
+                        {gameType === '4digit' && ['①', '②', '③', '④'][posIdx]}
+                        {gameType === '6digit' && ['①', '②', '③', '④', '⑤', '⑥'][posIdx]}
+                      </Text>
+                      <View style={styles.digitColumn}>
+                        {Array.from({ length: 10 }, (_, i) => i).map((v) => {
+                          const chosen = selectedNumbers[posIdx] === v;
+                          return (
+                            <Pressable key={`digit${posIdx}-${v}`} onPress={() => {
+                              if (betMode === 'manual') {
+                                const updated = [...selectedNumbers];
+                                updated[posIdx] = v;
+                                setSelectedNumbers(updated.slice(0, requiredDigits));
+                              }
+                            }} disabled={betMode !== 'manual'}
+                              style={[styles.numberChip, { 
+                                backgroundColor: chosen ? palette.numberSelected : palette.numberIdle,
+                                opacity: betMode === 'manual' ? 1 : 0.45,
+                              }]}>
+                              <Text style={[styles.numberChipText, { color: chosen ? palette.numberSelectedText : palette.numberIdleText }]}>
+                                {v}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))}
+                </View>
               );
-            })}
-          </View>
+            }
+
+            const digitCount = allowsDuplicates ? selectedNumbers.reduce((acc, n) => {
+              acc[n] = (acc[n] || 0) + 1;
+              return acc;
+            }, {} as Record<number, number>) : {};
+
+            return (
+              <View style={styles.numberGrid}>
+                {numberOptions.map((v) => {
+                  const count = allowsDuplicates ? (digitCount[v] || 0) : 0;
+                  const chosen = allowsDuplicates ? count > 0 : selectedBallSet.has(v);
+                  const chipWidth = 36;
+                  const chipHeight = 36;
+                  
+                  return (
+                    <Pressable key={`num-${v}`} onPress={() => toggleManualNumber(v)} disabled={betMode !== 'manual'}
+                      style={[styles.numberChip, { 
+                        backgroundColor: chosen ? palette.numberSelected : palette.numberIdle, 
+                        opacity: betMode === 'manual' ? 1 : 0.45,
+                        width: chipWidth,
+                        height: chipHeight,
+                        position: 'relative',
+                      }]}>
+                      <Text style={[styles.numberChipText, { color: chosen ? palette.numberSelectedText : palette.numberIdleText }]}>
+                        {v}
+                      </Text>
+                      {allowsDuplicates && count > 1 && (
+                        <View style={[styles.countBadge, { backgroundColor: palette.accent }]}>
+                          <Text style={[styles.countBadgeText, { color: palette.accentText }]}>{count}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            );
+          })()}
+          
 
           <View style={styles.stakeRow}>
             <Text style={[styles.stakeLabel, { color: palette.textSoft }]}>Stake per line</Text>
@@ -386,8 +942,8 @@ export default function HomeScreen() {
             <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Latest Official 9:00 PM Result</Text>
             <Text style={[styles.resultMeta, { color: palette.textSoft }]}>{selectedGame.name} - {latestSettledDrawKey}</Text>
             <View style={[styles.officialRow, { backgroundColor: palette.stageBg }]}>
-              {latestOfficialNumbers.map((v) => (
-                <View key={`official-${v}`} style={[styles.officialBall, { backgroundColor: palette.secondaryButton }]}>
+              {latestOfficialNumbers.map((v, idx) => (
+                <View key={`official-${idx}`} style={[styles.officialBall, { backgroundColor: palette.secondaryButton }]}>
                   <Text style={[styles.officialBallText, { color: palette.secondaryButtonText }]}>{v}</Text>
                 </View>
               ))}
@@ -405,48 +961,81 @@ const styles = StyleSheet.create({
   orbTop:    { position: 'absolute', width: 280, height: 280, borderRadius: 140, top: -80,   right: -85,  opacity: 0.55 },
   orbBottom: { position: 'absolute', width: 320, height: 320, borderRadius: 160, left: -130, bottom: -130, opacity: 0.42 },
   scrollContent: { padding: 16, gap: 14 },
-  heroCard:      { borderRadius: 18, padding: 16 },
-  heroRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
-  heroTag:       { fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', fontFamily: Fonts.mono },
-  heroTitle:     { marginTop: 4, fontSize: 24, fontWeight: '800', fontFamily: Fonts.rounded },
-  heroSubTitle:  { marginTop: 5, fontSize: 13, fontWeight: '500', fontFamily: Fonts.sans },
-  heroStatsRow:  { marginTop: 12, flexDirection: 'row', gap: 8 },
-  heroStat:      { flex: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
-  heroStatLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: Fonts.mono },
-  heroStatValue: { marginTop: 5, fontSize: 20, fontWeight: '800', fontFamily: Fonts.rounded },
-  drawMeta:      { marginTop: 10, fontSize: 12, fontWeight: '600', fontFamily: Fonts.sans },
-  drawSource:    { marginTop: 3, fontSize: 12, fontWeight: '500', fontFamily: Fonts.sans },
-  demoBadge:     { marginTop: 10, alignSelf: 'flex-start', borderRadius: 999, paddingVertical: 6, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  demoBadgeText: { fontSize: 12, fontWeight: '700', fontFamily: Fonts.sans },
+  heroCard:      { borderRadius: 20, padding: 18 },
+  heroTopRow:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  heroTag:       { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', fontFamily: Fonts.mono },
+  heroTitle:     { marginTop: 3, fontSize: 22, fontWeight: '800', fontFamily: Fonts.rounded },
+  heroDivider:   { height: 1, marginVertical: 14 },
+  heroStatsRow:  { flexDirection: 'row', gap: 8 },
+  heroStat:      { flex: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 12, alignItems: 'flex-start' },
+  heroStatLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: Fonts.mono },
+  heroStatValue: { marginTop: 4, fontSize: 15, fontWeight: '800', fontFamily: Fonts.rounded },
+  heroFootRow:   { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  heroFootText:  { fontSize: 11, fontWeight: '500', fontFamily: Fonts.sans },
+  demoBadge:     { borderRadius: 999, paddingVertical: 5, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  demoBadgeText: { fontSize: 11, fontWeight: '700', fontFamily: Fonts.sans },
   card:          { borderRadius: 16, borderWidth: 1, padding: 14 },
-  sectionTitle:  { fontSize: 18, fontWeight: '800', fontFamily: Fonts.rounded },
+  sectionTitle:  { fontSize: 18, fontWeight: '700', fontFamily: Fonts.rounded, letterSpacing: 0.3 },
   gameGrid:      { marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gameChip:      { borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, minWidth: '47%' },
   gameChipLabel: { fontSize: 13, fontWeight: '700', fontFamily: Fonts.sans },
   gameChipSub:   { marginTop: 2, fontSize: 11, fontWeight: '500', fontFamily: Fonts.mono },
-  modeRow:       { marginTop: 12, flexDirection: 'row', gap: 8 },
+  modeRow:       { marginTop: 14, flexDirection: 'row', gap: 10 },
   modeChip:      { flex: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
   modeChipText:  { fontSize: 13, fontWeight: '700', fontFamily: Fonts.sans },
-  luckyButton:   { marginTop: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', paddingVertical: 10, flexDirection: 'row', gap: 7 },
-  luckyButtonText:{ fontSize: 13, fontWeight: '700', fontFamily: Fonts.sans },
-  selectionTray: { marginTop: 12, flexDirection: 'row', gap: 8, justifyContent: 'space-between' },
-  selectionBall: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  selectionBallText: { fontSize: 14, fontWeight: '800', fontFamily: Fonts.rounded },
-  selectionHint: { marginTop: 8, fontSize: 12, fontWeight: '600', fontFamily: Fonts.sans },
-  numberGrid:    { marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  numberChip:    { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  numberChipText:{ fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono },
-  stakeRow:      { marginTop: 12 },
-  stakeLabel:    { fontSize: 12, fontWeight: '700', fontFamily: Fonts.sans },
-  stakeControlRow:{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  stakeButton:   { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  stakeButtonText:{ fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono },
-  stakeValue:    { fontSize: 18, fontWeight: '800', fontFamily: Fonts.rounded },
-  placeBetButton:{ marginTop: 12, borderRadius: 12, paddingVertical: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  placeBetText:  { fontSize: 14, fontWeight: '800', fontFamily: Fonts.rounded },
+  luckyButton:   { marginTop: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingVertical: 11, paddingHorizontal: 12, flexDirection: 'row', gap: 8 },
+  luckyButtonText:{ fontSize: 13, fontWeight: '700', fontFamily: Fonts.sans, letterSpacing: 0.2 },
+  selectionTray: { marginTop: 16, flexDirection: 'row', gap: 10, justifyContent: 'center', flexWrap: 'wrap' },
+  selectionBall: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  selectionBallText: { fontSize: 16, fontWeight: '800', fontFamily: Fonts.rounded },
+  countBadge:    { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  countBadgeText:{ fontSize: 10, fontWeight: '800', fontFamily: Fonts.rounded },
+  selectionHint: { marginTop: 10, fontSize: 11, fontWeight: '600', fontFamily: Fonts.sans, letterSpacing: 0.3 },
+  sectionLabel:  { fontSize: 12, fontWeight: '700', fontFamily: Fonts.sans, marginBottom: 8, letterSpacing: 0.5 },
+  numberGrid:    { marginTop: 14, flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  numberGridVertical: { marginTop: 10, flexDirection: 'column', gap: 6 },
+  digitColumn:   { gap: 6, alignItems: 'center' },
+  digitColumnsContainer: { marginTop: 12, borderRadius: 16, borderWidth: 1, padding: 12, flexDirection: 'row' },
+  digitColumnCard: { flex: 1, alignItems: 'center', borderRightWidth: 1, paddingHorizontal: 8 },
+  digitPositionLabel: { fontSize: 13, fontWeight: '700', marginBottom: 10, textAlign: 'center' },
+  numberChip:    { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  numberChipText:{ fontSize: 13, fontWeight: '700', fontFamily: Fonts.rounded },
+  stakeRow:      { marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  stakeLabel:    { fontSize: 12, fontWeight: '700', fontFamily: Fonts.sans, letterSpacing: 0.3 },
+  stakeControlRow:{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stakeButton:   { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
+  stakeButtonText:{ fontSize: 12, fontWeight: '700', fontFamily: Fonts.rounded, letterSpacing: 0.2 },
+  stakeValue:    { fontSize: 20, fontWeight: '900', fontFamily: Fonts.rounded, minWidth: 80, textAlign: 'center' },
+  placeBetButton:{ marginTop: 16, borderRadius: 14, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10 },
+  placeBetText:  { fontSize: 15, fontWeight: '800', fontFamily: Fonts.rounded, letterSpacing: 0.3 },
   noticeText:    { marginTop: 10, fontSize: 12, lineHeight: 18, fontWeight: '600', fontFamily: Fonts.sans },
   resultMeta:    { marginTop: 8, fontSize: 12, fontWeight: '500', fontFamily: Fonts.sans },
   officialRow:   { marginTop: 10, borderRadius: 12, padding: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   officialBall:  { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   officialBallText:{ fontSize: 13, fontWeight: '700', fontFamily: Fonts.rounded },
+  // Jackpot carousel
+  jackpotHeader:        { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  jackpotSubtitle:      { fontSize: 12, fontWeight: '500', fontFamily: Fonts.sans, marginTop: 2 },
+  jackpotDrawBadge:     { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  jackpotDrawBadgeText: { fontSize: 11, fontWeight: '700', fontFamily: Fonts.mono },
+  jackpotCounter:       { fontSize: 11, fontWeight: '600', fontFamily: Fonts.mono, marginTop: 6 },
+  jackpotSlide:         { width: SLIDE_W, borderRadius: 18, padding: 18, marginRight: SLIDE_GAP },
+  jackpotSlideTop:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  jackpotActivePill:    { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  jackpotActivePillText:{ fontSize: 10, fontWeight: '800', fontFamily: Fonts.mono },
+  jackpotGameName:      { fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono, textTransform: 'uppercase', letterSpacing: 0.5, flex: 1 },
+  jackpotAmount:        { fontSize: 28, fontWeight: '900', fontFamily: Fonts.rounded, marginBottom: 2 },
+  jackpotLabel:         { fontSize: 11, fontWeight: '500', fontFamily: Fonts.sans },
+  jackpotSlideDivider:  { height: 1, marginVertical: 12 },
+  jackpotDetailsRow:    { flexDirection: 'row', gap: 14, marginBottom: 8 },
+  jackpotDetailItem:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  jackpotDetailText:    { fontSize: 11, fontWeight: '600', fontFamily: Fonts.mono },
+  jackpotStatus:        { fontSize: 11, fontWeight: '600', fontFamily: Fonts.sans, marginBottom: 14 },
+  jackpotBetBtn:        { borderRadius: 12, paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  jackpotBetBtnText:    { fontSize: 13, fontWeight: '800', fontFamily: Fonts.rounded },
+  dotRow:               { flexDirection: 'row', justifyContent: 'center', gap: 5, marginTop: 14 },
+  dot:                  { height: 7, borderRadius: 4 },
+  categorySection: { marginTop: 12 },
+  categoryLabel:   { fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }
 });
+
