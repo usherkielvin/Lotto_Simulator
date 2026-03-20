@@ -11,6 +11,29 @@ import { usePalette } from '@/hooks/use-palette';
 import { useSession } from '@/hooks/use-session';
 
 const QUICK_AMOUNTS = [100, 500, 1000, 5000];
+const MIN_DEPOSIT = 50;
+
+function parsePesoAmount(raw: string) {
+  const normalized = raw.trim();
+  if (!normalized) {
+    return { value: null as number | null, error: 'Enter a deposit amount.' };
+  }
+
+  if (!/^\d+$/.test(normalized)) {
+    return { value: null as number | null, error: 'Use whole numbers only.' };
+  }
+
+  const value = Number(normalized);
+  if (!Number.isSafeInteger(value)) {
+    return { value: null as number | null, error: 'Amount is too large.' };
+  }
+
+  if (value < MIN_DEPOSIT) {
+    return { value: null as number | null, error: 'Minimum deposit is ₱50.' };
+  }
+
+  return { value, error: '' };
+}
 
 function formatPHP(v: number) {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 }).format(v);
@@ -20,7 +43,7 @@ export default function DepositScreen() {
   const p = usePalette();
   const router = useRouter();
   const { session } = useSession();
-  const { applyDelta } = useBalance();
+  const { setBalanceValue, refreshBalance } = useBalance();
   const userId = session?.userId;
 
   const [amount, setAmount] = useState('');
@@ -30,17 +53,31 @@ export default function DepositScreen() {
   const [newBal, setNewBal] = useState<number | null>(null);
 
   const confirm = async () => {
-    const val = parseFloat(amount);
-    if (!userId || isNaN(val) || val < 50) {
-      setIsErr(true); setMsg('Minimum deposit is ₱50.'); return;
+    const parsed = parsePesoAmount(amount);
+
+    if (!userId) {
+      setIsErr(true);
+      setMsg('Session expired. Please sign in again.');
+      return;
     }
+
+    if (parsed.error || parsed.value === null) {
+      setIsErr(true);
+      setMsg(parsed.error);
+      return;
+    }
+
+    const val = parsed.value;
+
     setBusy(true); setMsg(''); setIsErr(false);
     try {
       const res = await apiFetch<{ balance: number }>('/bets/balance', {
         method: 'POST', userId, body: { type: 'deposit', amount: val },
       });
-      setNewBal(Number(res.balance));
-      applyDelta(val);
+      const updatedBalance = Number(res.balance);
+      setNewBal(updatedBalance);
+      setBalanceValue(updatedBalance);
+      refreshBalance().catch(() => {});
       setAmount('');
       setIsErr(false);
       setMsg(`Successfully deposited ${formatPHP(val)}.`);
@@ -105,9 +142,13 @@ export default function DepositScreen() {
             style={[s.input, { color: p.textStrong }]}
             placeholder="0"
             placeholderTextColor={p.textSoft}
-            keyboardType="numeric"
+            keyboardType="number-pad"
             value={amount}
-            onChangeText={(v) => { setAmount(v); setMsg(''); setIsErr(false); }}
+            onChangeText={(v) => {
+              setAmount(v.replace(/[^\d]/g, ''));
+              setMsg('');
+              setIsErr(false);
+            }}
           />
         </View>
 
@@ -117,7 +158,7 @@ export default function DepositScreen() {
 
         <Pressable
           onPress={confirm}
-          disabled={busy}
+          disabled={busy || !amount.trim()}
           style={[s.confirmBtn, { backgroundColor: '#059669', opacity: busy ? 0.6 : 1 }]}
         >
           {busy

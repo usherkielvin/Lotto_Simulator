@@ -11,7 +11,6 @@ import {
     JACKPOT_ALERTS_ENABLED_KEY,
 } from '@/constants/settings';
 import { Fonts } from '@/constants/theme';
-import { disableDrawReminders, enableDrawReminders } from '@/hooks/use-draw-notifications';
 import { usePalette } from '@/hooks/use-palette';
 
 type ToggleItem = {
@@ -33,7 +32,6 @@ export default function NotificationSettingsScreen() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
   const [drawNotificationsEnabled, setDrawNotificationsEnabled] = useState(false);
   const [jackpotAlertsEnabled, setJackpotAlertsEnabled] = useState(true);
@@ -58,7 +56,6 @@ export default function NotificationSettingsScreen() {
   }, []);
 
   const saveToggle = async (key: string, nextValue: boolean, setter: (next: boolean) => void) => {
-    setBusyKey(key);
     setter(nextValue);
     setFeedback('');
 
@@ -67,32 +64,6 @@ export default function NotificationSettingsScreen() {
       setFeedback('Saved');
     } catch {
       setFeedback('Could not save this preference right now.');
-    } finally {
-      setBusyKey(null);
-    }
-  };
-
-  const toggleDrawReminders = async (nextValue: boolean) => {
-    setBusyKey(DRAW_NOTIFICATIONS_ENABLED_KEY);
-    setFeedback('');
-
-    try {
-      if (nextValue) {
-        const result = await enableDrawReminders();
-        setDrawNotificationsEnabled(result.ok);
-        await AsyncStorage.setItem(DRAW_NOTIFICATIONS_ENABLED_KEY, result.ok ? '1' : '0');
-        setFeedback(result.message);
-        return;
-      }
-
-      await disableDrawReminders();
-      await AsyncStorage.setItem(DRAW_NOTIFICATIONS_ENABLED_KEY, '0');
-      setDrawNotificationsEnabled(false);
-      setFeedback('Draw reminders are off.');
-    } catch {
-      setFeedback('Could not update draw reminders right now.');
-    } finally {
-      setBusyKey(null);
     }
   };
 
@@ -121,10 +92,8 @@ export default function NotificationSettingsScreen() {
   ];
 
   const handleToggle = async (item: ToggleItem, nextValue: boolean) => {
-    if (busyKey !== null) return;
-
     if (item.key === DRAW_NOTIFICATIONS_ENABLED_KEY) {
-      await toggleDrawReminders(nextValue);
+      await saveToggle(item.key, nextValue, setDrawNotificationsEnabled);
       return;
     }
 
@@ -152,7 +121,7 @@ export default function NotificationSettingsScreen() {
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={[s.infoCard, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
           <Text style={[s.infoTitle, { color: p.textStrong }]}>Notification controls</Text>
-          <Text style={[s.infoCopy, { color: p.textSoft }]}>Draw reminders use your device notification permission and trigger at 8:45 PM before draw lock.</Text>
+          <Text style={[s.infoCopy, { color: p.textSoft }]}>These settings are saved locally for this device profile.</Text>
         </View>
 
         <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
@@ -174,7 +143,7 @@ export default function NotificationSettingsScreen() {
                   <Switch
                     value={item.value}
                     onValueChange={(next) => { void handleToggle(item, next); }}
-                    disabled={loading || busyKey !== null}
+                    disabled={loading}
                     trackColor={{ false: p.chipIdle, true: p.accent }}
                     thumbColor="#ffffff"
                   />

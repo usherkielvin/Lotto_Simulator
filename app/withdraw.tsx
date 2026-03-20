@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,6 +11,29 @@ import { usePalette } from '@/hooks/use-palette';
 import { useSession } from '@/hooks/use-session';
 
 const QUICK_AMOUNTS = [100, 500, 1000, 5000];
+const MIN_WITHDRAWAL = 50;
+
+function parsePesoAmount(raw: string) {
+  const normalized = raw.trim();
+  if (!normalized) {
+    return { value: null as number | null, error: 'Enter a withdrawal amount.' };
+  }
+
+  if (!/^\d+$/.test(normalized)) {
+    return { value: null as number | null, error: 'Use whole numbers only.' };
+  }
+
+  const value = Number(normalized);
+  if (!Number.isSafeInteger(value)) {
+    return { value: null as number | null, error: 'Amount is too large.' };
+  }
+
+  if (value < MIN_WITHDRAWAL) {
+    return { value: null as number | null, error: 'Minimum withdrawal is ₱50.' };
+  }
+
+  return { value, error: '' };
+}
 
 function formatPHP(v: number) {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 }).format(v);
@@ -20,7 +43,7 @@ export default function WithdrawScreen() {
   const p = usePalette();
   const router = useRouter();
   const { session } = useSession();
-  const { balance: globalBalance, applyDelta } = useBalance();
+  const { balance: globalBalance, refreshBalance, setBalanceValue } = useBalance();
   const userId = session?.userId;
 
   const [amount,  setAmount]  = useState('');
@@ -32,21 +55,51 @@ export default function WithdrawScreen() {
   // use global balance as the displayed available balance
   const balance = globalBalance;
 
+  useEffect(() => {
+    refreshBalance().catch(() => {});
+  }, [refreshBalance]);
+
   const confirm = async () => {
-    const val = parseFloat(amount);
-    if (!userId || isNaN(val) || val < 50) {
-      setIsErr(true); setMsg('Minimum withdrawal is ₱50.'); return;
+    const parsed = parsePesoAmount(amount);
+
+    if (!userId) {
+      setIsErr(true);
+      setMsg('Session expired. Please sign in again.');
+      return;
     }
+
+    if (balance === null) {
+      setIsErr(true);
+      setMsg('Balance is still syncing. Please try again in a moment.');
+      return;
+    }
+
+    if (parsed.error || parsed.value === null) {
+      setIsErr(true);
+      setMsg(parsed.error);
+      return;
+    }
+
+    const val = parsed.value;
+
+    if (val > balance) {
+      setIsErr(true);
+      setMsg('Insufficient balance for this withdrawal.');
+      return;
+    }
+
     setBusy(true); setMsg(''); setIsErr(false);
     try {
       const res = await apiFetch<{ balance: number }>('/bets/balance', {
         method: 'POST', userId, body: { type: 'withdraw', amount: val },
       });
-      setNewBal(Number(res.balance));
+      const updatedBalance = Number(res.balance);
+      setNewBal(updatedBalance);
+      setBalanceValue(updatedBalance);
+      refreshBalance().catch(() => {});
       setAmount('');
       setIsErr(false);
       setMsg(`Successfully withdrawn ${formatPHP(val)}.`);
-      applyDelta(-val);
     } catch (e: unknown) {
       setIsErr(true);
       setMsg(e instanceof Error ? e.message : 'Withdrawal failed.');
@@ -109,9 +162,13 @@ export default function WithdrawScreen() {
             style={[s.input, { color: p.textStrong }]}
             placeholder="0"
             placeholderTextColor={p.textSoft}
-            keyboardType="numeric"
+            keyboardType="number-pad"
             value={amount}
-            onChangeText={(v) => { setAmount(v); setMsg(''); setIsErr(false); }}
+            onChangeText={(v) => {
+              setAmount(v.replace(/[^\d]/g, ''));
+              setMsg('');
+              setIsErr(false);
+            }}
           />
         </View>
 
@@ -121,7 +178,7 @@ export default function WithdrawScreen() {
 
         <Pressable
           onPress={confirm}
-          disabled={busy}
+          disabled={busy || !amount.trim()}
           style={[s.confirmBtn, { backgroundColor: '#dc2626', opacity: busy ? 0.6 : 1 }]}
         >
           {busy

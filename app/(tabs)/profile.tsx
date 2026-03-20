@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
 import { apiFetch } from '@/hooks/use-api';
+import { useBalance } from '@/hooks/use-balance';
 import { usePalette } from '@/hooks/use-palette';
 import { useSession } from '@/hooks/use-session';
 
@@ -35,6 +36,7 @@ export default function ProfileScreen() {
   const p = usePalette();
   const router = useRouter();
   const { session, signOut } = useSession();
+  const { balance: liveBalance } = useBalance();
   const userId = session?.userId;
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -68,6 +70,7 @@ export default function ProfileScreen() {
   }
 
   const initial = (profile?.displayName ?? session.displayName ?? 'P')[0].toUpperCase();
+  const displayedBalance = liveBalance ?? profile?.balance ?? null;
 
   return (
     <SafeAreaView style={[s.root, { backgroundColor: p.screenBg }]}>
@@ -92,7 +95,7 @@ export default function ProfileScreen() {
               </View>
               <View style={[s.balanceRow, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
                 <Text style={[s.balanceLabel, { color: 'rgba(255,255,255,0.70)' }]}>Demo Balance</Text>
-                <Text style={[s.balanceValue, { color: p.accent }]}>{profile ? formatPHP(profile.balance) : 'Unavailable'}</Text>
+                <Text style={[s.balanceValue, { color: p.accent }]}>{displayedBalance !== null ? formatPHP(displayedBalance) : 'Unavailable'}</Text>
                 <View style={[s.balanceDivider, { backgroundColor: 'rgba(255,255,255,0.22)' }]} />
                 <View style={s.balanceActionsRow}>
                   <Pressable

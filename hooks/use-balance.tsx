@@ -6,12 +6,14 @@ import { useSession } from '@/hooks/use-session';
 type BalanceCtx = {
   balance: number | null;
   refreshBalance: () => Promise<void>;
+  setBalanceValue: (value: number | null) => void;
   applyDelta: (delta: number) => void; // instant optimistic update
 };
 
 const Ctx = createContext<BalanceCtx>({
   balance: null,
   refreshBalance: async () => {},
+  setBalanceValue: () => {},
   applyDelta: () => {},
 });
 
@@ -41,7 +43,11 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
     setBalance((prev) => (prev !== null ? prev + delta : prev));
   }, []);
 
-  return <Ctx.Provider value={{ balance, refreshBalance, applyDelta }}>{children}</Ctx.Provider>;
+  const setBalanceValue = useCallback((value: number | null) => {
+    setBalance(value);
+  }, []);
+
+  return <Ctx.Provider value={{ balance, refreshBalance, setBalanceValue, applyDelta }}>{children}</Ctx.Provider>;
 }
 
 export function useBalance() {

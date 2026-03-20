@@ -16,6 +16,7 @@ interface Ticket {
   gameId: string;
   gameName: string;
   drawDateKey: string;
+  drawTime?: string | null;
   placedAt: string;
   numbers: number[];
   stake: number;
@@ -29,13 +30,18 @@ function formatPHP(v: number) {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 }).format(v);
 }
 
+function formatTicketDrawLabel(ticket: Ticket) {
+  const drawTime = ticket.drawTime?.trim();
+  return `Draw: ${ticket.drawDateKey} · ${drawTime && drawTime.length > 0 ? drawTime : '9:00 PM'}`;
+}
+
 function ActiveCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePalette> }) {
   return (
     <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
       <View style={s.cardHead}>
         <View style={{ flex: 1 }}>
           <Text style={[s.cardGame, { color: p.textStrong }]}>{ticket.gameName}</Text>
-          <Text style={[s.cardMeta, { color: p.textSoft  }]}>Draw: {ticket.drawDateKey} · 9:00 PM</Text>
+          <Text style={[s.cardMeta, { color: p.textSoft  }]}>{formatTicketDrawLabel(ticket)}</Text>
         </View>
         <View style={[s.badge, { backgroundColor: p.secondaryButton }]}>
           <Ionicons name="time-outline" size={12} color={p.secondaryButtonText} />
@@ -44,8 +50,8 @@ function ActiveCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePal
       </View>
 
       <View style={s.ballsRow}>
-        {ticket.numbers.map((n) => (
-          <View key={n} style={[s.ball, { backgroundColor: p.stageBg }]}>
+        {ticket.numbers.map((n, idx) => (
+          <View key={`${ticket.id}-${n}-${idx}`} style={[s.ball, { backgroundColor: p.stageBg }]}> 
             <Text style={[s.ballText, { color: p.textStrong }]}>{n}</Text>
           </View>
         ))}
@@ -64,6 +70,7 @@ function ActiveCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePal
 function HistoryCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePalette> }) {
   const won     = (ticket.payout ?? 0) > 0;
   const winning = ticket.officialNumbers ?? [];
+  const drawTime = ticket.drawTime?.trim();
 
   const cardBg  = won ? p.accent              : p.cardBg;
   const cardTxt = won ? '#3d2800'             : p.textStrong;
@@ -85,7 +92,7 @@ function HistoryCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePa
       <View style={s.cardHead}>
         <View style={{ flex: 1 }}>
           <Text style={[s.cardGame, { color: cardTxt }]}>{ticket.gameName}</Text>
-          <Text style={[s.cardMeta, { color: cardSub }]}>{ticket.drawDateKey}</Text>
+          <Text style={[s.cardMeta, { color: cardSub }]}>{ticket.drawDateKey}{drawTime ? ` · ${drawTime}` : ''}</Text>
         </View>
         <View style={[s.badge, { backgroundColor: badgeBg }]}>
           <Ionicons name={iconName} size={12} color={badgeTxt} />
@@ -94,10 +101,10 @@ function HistoryCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePa
       </View>
 
       <View style={s.ballsRow}>
-        {ticket.numbers.map((n) => {
+        {ticket.numbers.map((n, idx) => {
           const isMatch = (ticket.matches ?? 0) >= 3 && winning.includes(n);
           return (
-            <View key={n} style={[s.ball, { backgroundColor: isMatch ? '#3d2800' : ballBg }, isMatch && s.ballHighlight]}>
+            <View key={`${ticket.id}-${n}-${idx}`} style={[s.ball, { backgroundColor: isMatch ? '#3d2800' : ballBg }, isMatch && s.ballHighlight]}>
               <Text style={[s.ballText, { color: isMatch ? '#f4b400' : ballTxt, fontWeight: isMatch ? '900' : '700' }]}>{n}</Text>
             </View>
           );

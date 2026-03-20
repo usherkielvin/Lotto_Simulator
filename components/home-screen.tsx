@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -44,19 +44,46 @@ type Palette = {
 
 function pad2(v: number) { return v.toString().padStart(2, '0'); }
 function toLocalDateKey(d: Date) { return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
-function drawDateFromKey(key: string) {
+// Parse "2:00 PM, 5:00 PM, 9:00 PM" → sorted [14, 17, 21] (hours)
+function parseDrawHours(drawTime: string): number[] {
+  return drawTime.split(',').map(t => {
+    const m = t.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!m) return 21;
+    let h = parseInt(m[1], 10);
+    if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+    return h;
+  }).sort((a, b) => a - b);
+}
+function getNextDrawAt(ref: Date, drawTime = '9:00 PM') {
+  const hours = parseDrawHours(drawTime);
+  const refMs = ref.getTime();
+  for (const h of hours) {
+    const candidate = new Date(ref); candidate.setHours(h, 0, 0, 0);
+    if (refMs < candidate.getTime()) return candidate;
+  }
+  // All draws passed today — next is first draw tomorrow
+  const tomorrow = new Date(ref); tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(hours[0], 0, 0, 0);
+  return tomorrow;
+}
+function getLatestSettledDrawAt(ref: Date, drawTime = '9:00 PM') {
+  const hours = parseDrawHours(drawTime);
+  const refMs = ref.getTime();
+  // Walk backwards through today's draws
+  for (let i = hours.length - 1; i >= 0; i--) {
+    const candidate = new Date(ref); candidate.setHours(hours[i], 0, 0, 0);
+    if (refMs >= candidate.getTime()) return candidate;
+  }
+  // All draws are in the future — last settled was last draw yesterday
+  const yesterday = new Date(ref); yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(hours[hours.length - 1], 0, 0, 0);
+  return yesterday;
+}
+function drawDateFromKey(key: string, drawTime = '9:00 PM') {
   const [y,m,d] = key.split('-').map(Number);
-  return new Date(y, m-1, d, 21, 0, 0, 0);
-}
-function getNextDrawAt(ref: Date) {
-  const draw = new Date(ref); draw.setHours(21,0,0,0);
-  if (ref.getTime() >= draw.getTime()) draw.setDate(draw.getDate()+1);
-  return draw;
-}
-function getLatestSettledDrawAt(ref: Date) {
-  const draw = new Date(ref); draw.setHours(21,0,0,0);
-  if (ref.getTime() < draw.getTime()) draw.setDate(draw.getDate()-1);
-  return draw;
+  const hours = parseDrawHours(drawTime);
+  return new Date(y, m-1, d, hours[hours.length - 1], 0, 0, 0);
 }
 function getCountdownLabel(target: Date, now: Date) {
   const ms = target.getTime() - now.getTime();
@@ -146,20 +173,17 @@ function formatCurrency(v: number) {
 function isGameAvailableToday(game: LottoGame, now: Date): boolean {
   if (!game.drawDays) return true;
   
-  // Get day of week: 0 = Sunday, 1 = Monday, ... 6 = Saturday
-  const dayOfWeek = now.getDay();
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const currentDay = dayNames[dayOfWeek];
-  const currentDayNum = String(dayOfWeek);
+  // DB uses 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun
+  // JS getDay() uses 0=Sun, 1=Mon, ..., 6=Sat — convert to DB convention
+  const jsDay = now.getDay();
+  const dbDay = jsDay === 0 ? 7 : jsDay; // Sun(0) → 7, Mon(1) → 1, ..., Sat(6) → 6
   
-  // Split drawDays by comma and check if current day is included
   const availableDays = game.drawDays.split(',').map(d => d.trim());
-  
-  // Check if day name or day number matches
-  return availableDays.includes(currentDay) || availableDays.includes(currentDayNum) || availableDays.includes(String(dayOfWeek));
+  return availableDays.includes(String(dbDay));
 }
 
-const MIN_STAKE = 20;
+const MIN_STAKE_DIGIT = 10;  // 2D, 3D, 4D, 6D
+const MIN_STAKE_LOTTO = 20;  // 6-number games
 const MAX_STAKE = 500;
 
 const SCREEN_W  = Dimensions.get('window').width;
@@ -208,7 +232,7 @@ export default function HomeScreen() {
   const [selectedGameId, setSelectedGameId] = useState('');
   const [betMode, setBetMode] = useState<BetMode>('manual');
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
-  const [stake, setStake] = useState(MIN_STAKE);
+  const [stake, setStake] = useState(MIN_STAKE_LOTTO);
   const [notice, setNotice] = useState('Select a game and build your bet slip to continue.');
   const [now, setNow] = useState(() => new Date());
   const [placingBet, setPlacingBet] = useState(false);
@@ -248,7 +272,7 @@ export default function HomeScreen() {
   }, [uid]);
 
   const selectedGame = useMemo(
-    () => games.find(g => g.id === selectedGameId && isGameAvailableToday(g, now)) ?? games.find(g => isGameAvailableToday(g, now)) ?? games[0],
+    () => games.find(g => g.id === selectedGameId) ?? games.find(g => isGameAvailableToday(g, now)) ?? games[0],
     [games, selectedGameId, now],
   );
 
@@ -308,13 +332,19 @@ export default function HomeScreen() {
     }
   }, [selectedGame, selectedGameId]);
 
-  // Clear selected numbers when game changes
-  useEffect(() => { setSelectedNumbers([]); }, [selectedGameId]);
+  // Clear selected numbers when game changes, reset stake to game minimum
+  useEffect(() => {
+    setSelectedNumbers([]);
+    const gt = selectedGame ? getGameType(selectedGame) : '6number';
+    const isDigit = isDigitGame(gt) || gt === '2number';
+    setStake(isDigit ? MIN_STAKE_DIGIT : MIN_STAKE_LOTTO);
+  }, [selectedGameId]);
 
-  const nextDrawAt = getNextDrawAt(now);
+  const gameDrawTime = selectedGame?.drawTime ?? '9:00 PM';
+  const nextDrawAt = getNextDrawAt(now, gameDrawTime);
   const nextDrawDateKey = toLocalDateKey(nextDrawAt);
   const nextDrawLabel = nextDrawAt.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
-  const latestSettledDrawAt = getLatestSettledDrawAt(now);
+  const latestSettledDrawAt = getLatestSettledDrawAt(now, gameDrawTime);
   const latestSettledDrawKey = toLocalDateKey(latestSettledDrawAt);
   const latestOfficialNumbers = selectedGame ? buildOfficialNumbers(selectedGame, latestSettledDrawKey) : [];
   const countdownLabel = getCountdownLabel(nextDrawAt, now);
@@ -392,7 +422,11 @@ export default function HomeScreen() {
   };
 
   const changeStake = (delta: number) => {
-    setStake(cur => Math.min(MAX_STAKE, Math.max(MIN_STAKE, cur + delta)));
+    const gt = selectedGame ? getGameType(selectedGame) : '6number';
+    const isDigit = isDigitGame(gt) || gt === '2number';
+    const minStake = isDigit ? MIN_STAKE_DIGIT : MIN_STAKE_LOTTO;
+    const step = isDigit ? 10 : 20;
+    setStake(cur => Math.min(MAX_STAKE, Math.max(minStake, cur + (delta > 0 ? step : -step))));
   };
 
   const selectGame = (id: string) => {
@@ -411,7 +445,7 @@ export default function HomeScreen() {
 
     const drawCutoff = drawDateFromKey(nextDrawDateKey);
     if (now.getTime() >= drawCutoff.getTime()) {
-      setNotice('Betting is locked for this draw. Please wait for the next 9:00 PM round.');
+      setNotice(`Betting is locked for this draw. Please wait for the next ${getNextDrawAt(new Date(now.getTime() + 60000), gameDrawTime).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })} round.`);
       return;
     }
 
@@ -452,7 +486,7 @@ export default function HomeScreen() {
         body: { gameId: selectedGame.id, numbers: activeNumbers, stake },
       });
       setBalance(cur => cur - stake);
-      setNotice(`Bet placed for ${selectedGame.name} on ${nextDrawDateKey} 9:00 PM. Stake: ${formatCurrency(stake)}.`);
+      setNotice(`Bet placed for ${selectedGame.name} on ${nextDrawDateKey} ${nextDrawAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })}. Stake: ${formatCurrency(stake)}.`);
       if (betMode === 'manual') setSelectedNumbers([]);
       else setSelectedNumbers(activeNumbers);
       triggerBoardPulse();
@@ -929,22 +963,29 @@ export default function HomeScreen() {
 
           <View style={styles.stakeRow}>
             <Text style={[styles.stakeLabel, { color: palette.textSoft }]}>Stake per line</Text>
-            <View style={styles.stakeControlRow}>
-              <Pressable style={[styles.stakeButton, { backgroundColor: palette.chipIdle }]} onPress={() => changeStake(-20)}>
-                <Text style={[styles.stakeButtonText, { color: palette.chipIdleText }]}>-20</Text>
-              </Pressable>
-              <Text style={[styles.stakeValue, { color: palette.textStrong }]}>{formatCurrency(stake)}</Text>
-              <Pressable style={[styles.stakeButton, { backgroundColor: palette.chipIdle }]} onPress={() => changeStake(20)}>
-                <Text style={[styles.stakeButtonText, { color: palette.chipIdleText }]}>+20</Text>
-              </Pressable>
-            </View>
+            {(() => {
+              const gt = selectedGame ? getGameType(selectedGame) : '6number';
+              const isSmall = isDigitGame(gt) || gt === '2number';
+              const step = isSmall ? 10 : 20;
+              return (
+                <View style={styles.stakeControlRow}>
+                  <Pressable style={[styles.stakeButton, { backgroundColor: palette.chipIdle }]} onPress={() => changeStake(-step)}>
+                    <Text style={[styles.stakeButtonText, { color: palette.chipIdleText }]}>-{step}</Text>
+                  </Pressable>
+                  <Text style={[styles.stakeValue, { color: palette.textStrong }]}>{formatCurrency(stake)}</Text>
+                  <Pressable style={[styles.stakeButton, { backgroundColor: palette.chipIdle }]} onPress={() => changeStake(step)}>
+                    <Text style={[styles.stakeButtonText, { color: palette.chipIdleText }]}>+{step}</Text>
+                  </Pressable>
+                </View>
+              );
+            })()}
           </View>
 
           <Pressable style={[styles.placeBetButton, { backgroundColor: palette.accent, opacity: placingBet ? 0.7 : 1 }]}
             onPress={placeBet} disabled={placingBet}>
             <Ionicons name="ticket-outline" size={16} color={palette.accentText} />
             <Text style={[styles.placeBetText, { color: palette.accentText }]}>
-              {placingBet ? 'Placing Bet…' : 'Place Bet for 9:00 PM Draw'}
+              {placingBet ? 'Placing Bet…' : `Place Bet for ${nextDrawAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })} Draw`}
             </Text>
           </Pressable>
 
@@ -954,7 +995,7 @@ export default function HomeScreen() {
         {/* Latest Official Numbers */}
         {selectedGame && (
           <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
-            <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Latest Official 9:00 PM Result</Text>
+            <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Latest Official {latestSettledDrawAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })} Result</Text>
             <Text style={[styles.resultMeta, { color: palette.textSoft }]}>{selectedGame.name} - {latestSettledDrawKey}</Text>
             <View style={[styles.officialRow, { backgroundColor: palette.stageBg }]}>
               {latestOfficialNumbers.map((v, idx) => (
