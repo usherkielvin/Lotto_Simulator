@@ -18,19 +18,24 @@ function resolveScheme(systemScheme: Scheme): Scheme {
  */
 export function useColorScheme() {
   const [hasHydrated, setHasHydrated] = useState(false);
-  const [themeVersion, setThemeVersion] = useState(0);
+  const [mode, setMode] = useState<'light' | 'dark' | 'system'>(getThemeMode());
 
   useEffect(() => {
     setHasHydrated(true);
     initThemeMode().catch(() => {});
-    return subscribeThemeMode(() => setThemeVersion((v) => v + 1));
+    return subscribeThemeMode(() => setMode(getThemeMode()));
   }, []);
 
-  const colorScheme = (useRNColorScheme() ?? 'light') as Scheme;
+  const systemScheme = (useRNColorScheme() ?? 'light') as Scheme;
 
   if (!hasHydrated) {
     return 'light';
   }
 
-  return useMemo(() => resolveScheme(colorScheme), [colorScheme, themeVersion]);
+  return useMemo(() => {
+    if (mode === 'system') {
+      return systemScheme;
+    }
+    return mode;
+  }, [systemScheme, mode]);
 }

@@ -29,6 +29,7 @@ export default function AdminScreen() {
   const [games, setGames] = useState<LottoGame[]>([]);
   const [results, setResults] = useState<OfficialResult[]>([]);
   const [loadingResults, setLoadingResults] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   // Modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -114,6 +115,23 @@ export default function AdminScreen() {
     }
   };
 
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await apiFetch<{ updatedCount: number }>('/admin/sync-pcso', {
+        method: 'POST',
+        userId: session!.userId,
+      });
+      alert(`Sync successful! Updated ${res.updatedCount} results.`);
+      fetchResults();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to sync with PCSO.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     try {
       await apiFetch(`/admin/results/${id}`, { method: 'DELETE', userId: session!.userId });
@@ -134,10 +152,26 @@ export default function AdminScreen() {
             <Text style={[s.title, { color: p.textStrong }]}>Admin Panel</Text>
             <Text style={[s.subtitle, { color: p.textSoft }]}>Manage Official Draw Results</Text>
           </View>
-          <Pressable style={[s.addBtn, { backgroundColor: p.accent }]} onPress={openAdd}>
-            <Ionicons name="add" size={18} color={p.accentText} />
-            <Text style={[s.addBtnText, { color: p.accentText }]}>Add Result</Text>
-          </Pressable>
+          <View style={s.headerBtns}>
+            <Pressable 
+              style={[s.syncBtn, { backgroundColor: p.chipIdle, opacity: syncing ? 0.6 : 1 }]} 
+              onPress={handleSync}
+              disabled={syncing}
+            >
+              {syncing ? (
+                <ActivityIndicator size="small" color={p.chipIdleText} />
+              ) : (
+                <>
+                  <Ionicons name="sync" size={16} color={p.chipIdleText} />
+                  <Text style={[s.syncBtnText, { color: p.chipIdleText }]}>PCSO Sync</Text>
+                </>
+              )}
+            </Pressable>
+            <Pressable style={[s.addBtn, { backgroundColor: p.accent }]} onPress={openAdd}>
+              <Ionicons name="add" size={18} color={p.accentText} />
+              <Text style={[s.addBtnText, { color: p.accentText }]}>Add Result</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Results list */}
@@ -248,11 +282,14 @@ const s = StyleSheet.create({
   root:             { flex: 1 },
   center:           { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   scroll:           { padding: 16, gap: 14 },
-  headerRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerRow:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 10, flexWrap: 'wrap' },
+  headerBtns:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title:            { fontSize: 24, fontWeight: '800', fontFamily: Fonts.rounded },
   subtitle:         { fontSize: 13, fontWeight: '500', fontFamily: Fonts.sans, marginTop: 2 },
   addBtn:           { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
   addBtnText:       { fontSize: 14, fontWeight: '800', fontFamily: Fonts.rounded },
+  syncBtn:          { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, gap: 4, minWidth: 100, justifyContent: 'center' },
+  syncBtnText:      { fontSize: 13, fontWeight: '700', fontFamily: Fonts.sans },
   card:             { borderRadius: 16, borderWidth: 1, padding: 14 },
   sectionTitle:     { fontSize: 16, fontWeight: '800', fontFamily: Fonts.rounded, marginBottom: 10 },
   emptyText:        { fontSize: 13, fontWeight: '500', fontFamily: Fonts.sans, marginTop: 8, marginBottom: 8 },

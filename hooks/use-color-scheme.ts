@@ -15,12 +15,17 @@ function resolveScheme(systemScheme: Scheme): Scheme {
 
 export function useColorScheme(): Scheme {
 	const systemScheme = useRNColorScheme() ?? 'light';
-	const [themeVersion, setThemeVersion] = useState(0);
+	const [mode, setMode] = useState<'light' | 'dark' | 'system'>(getThemeMode());
 
 	useEffect(() => {
 		initThemeMode().catch(() => {});
-		return subscribeThemeMode(() => setThemeVersion((v) => v + 1));
+		return subscribeThemeMode(() => setMode(getThemeMode()));
 	}, []);
 
-	return useMemo(() => resolveScheme(systemScheme), [systemScheme, themeVersion]);
+	return useMemo(() => {
+		if (mode === 'system') {
+			return systemScheme;
+		}
+		return mode;
+	}, [systemScheme, mode]);
 }

@@ -33,10 +33,10 @@ export default function ThemeSettingsScreen() {
 
   const applyMode = async (nextMode: ThemeMode) => {
     if (nextMode === mode || busy) return;
-    setMode(nextMode); // update UI immediately
     setBusy(true);
     try {
       await setThemeMode(nextMode);
+      setMode(nextMode); // Update state after store updates to trigger sync
     } finally {
       setBusy(false);
     }

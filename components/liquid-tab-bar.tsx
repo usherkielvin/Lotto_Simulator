@@ -7,7 +7,6 @@ import {
     Pressable,
     StyleSheet,
     Text,
-    useColorScheme,
     useWindowDimensions,
     View,
 } from 'react-native';
@@ -22,6 +21,8 @@ import Animated, {
     withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const BASE_TAB_BAR_WIDTH_RATIO = 1;
 const TAB_BAR_BASE_HEIGHT = 60;

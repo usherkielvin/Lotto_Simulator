@@ -26,8 +26,7 @@ function parseThemeMode(raw: string | null): ThemeMode {
 export async function initThemeMode() {
   if (initialized) return;
   if (initializing) {
-    await initializing;
-    return;
+    return initializing;
   }
 
   initializing = AsyncStorage.getItem(APP_THEME_MODE_KEY)
@@ -44,7 +43,7 @@ export async function initThemeMode() {
       initializing = null;
     });
 
-  await initializing;
+  return initializing;
 }
 
 export function getThemeMode() {

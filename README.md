@@ -7,13 +7,29 @@ It simulates a PCSO-style betting flow: pick numbers, place bets, track tickets,
 ## Project Highlights
 
 - Multi-game lotto simulator with daily and scheduled draw availability
+- Real-time PCSO official data integration (jackpots, results, winners)
 - 9:00 PM draw countdown and draw lock logic
 - Manual pick + lucky pick betting modes
 - Ticket tracking (active and settled history)
 - Wallet actions: deposit, withdraw, and funding history
-- Admin result management panel
+- Admin result management panel with **One-Tap PCSO Sync**
 - Offline explore mode with cached read endpoints
-- Unified light/dark palette with custom liquid-style tab UI
+- Theme Customization: unified light/dark/system mode switching with custom liquid-style tab UI
+
+## Theme Setup
+
+The app supports a full-application theme switching experience:
+
+- **Store-Driven Theme Mode**: Centralized preference storage with persistent `AsyncStorage`.
+- **Reactive Color Scheme**: Custom `useColorScheme` hook that ensures instant UI updates for the tab bar, status bar, and all styled components when the theme is toggled.
+- **Dynamic Palette**: The `usePalette` hook maps the active theme to a curated set of colors for consistent branding across light and dark modes.
+
+## Real-Time PCSO Data
+
+Users can sync the simulator with live data from the [official PCSO website](https://www.pcso.gov.ph/searchlottoresult.aspx).
+
+- **Sync Mechanism**: Admin users can trigger a backend sync that scrapes the latest draw results and jackpot amounts.
+- **Auto-Settlement**: The app automatically compares user tickets against the real PCSO numbers to settle bets and award simulated winnings.
 
 ## UI Showcase
 
