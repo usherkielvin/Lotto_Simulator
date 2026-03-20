@@ -443,7 +443,7 @@ export default function HomeScreen() {
   const placeBet = async () => {
     if (!selectedGame || !uid) { setNotice('Session error. Please log in again.'); return; }
 
-    const drawCutoff = drawDateFromKey(nextDrawDateKey);
+    const drawCutoff = nextDrawAt;
     if (now.getTime() >= drawCutoff.getTime()) {
       setNotice(`Betting is locked for this draw. Please wait for the next ${getNextDrawAt(new Date(now.getTime() + 60000), gameDrawTime).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })} round.`);
       return;
@@ -1004,7 +1004,7 @@ export default function HomeScreen() {
                 </View>
               ))}
             </View>
-            <Text style={[styles.resultMeta, { color: palette.textSoft }]}>Your pending bets auto-settle right after 9:00 PM.</Text>
+            <Text style={[styles.resultMeta, { color: palette.textSoft }]}>Your pending bets auto-settle right after the scheduled draw time.</Text>
           </View>
         )}
       </ScrollView>

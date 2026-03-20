@@ -33,6 +33,7 @@ export default function ThemeSettingsScreen() {
 
   const applyMode = async (nextMode: ThemeMode) => {
     if (nextMode === mode || busy) return;
+    setMode(nextMode); // update UI immediately
     setBusy(true);
     try {
       await setThemeMode(nextMode);
@@ -60,17 +61,30 @@ export default function ThemeSettingsScreen() {
           <Text style={[s.currentValue, { color: p.textStrong }]}>{activeScheme === 'dark' ? 'Dark' : 'Light'}</Text>
         </View>
 
-        <View style={[s.optionsCard, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
+        <View style={[s.optionsCard, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}> 
           {MODES.map((item, idx) => {
             const selected = item.value === mode;
             return (
               <View key={item.value}>
                 <Pressable
                   style={s.optionRow}
-                  onPress={() => applyMode(item.value)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  onPress={() => {
+                    if (!busy && !selected) {
+                      setMode(item.value);
+                      applyMode(item.value);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (!busy && !selected) {
+                      setMode(item.value);
+                      applyMode(item.value);
+                    }
+                  }}
                   disabled={busy}
                 >
-                  <View style={[s.iconWrap, { backgroundColor: selected ? p.chipActive : p.chipIdle }]}>
+                  <View style={[s.iconWrap, { backgroundColor: selected ? p.chipActive : p.chipIdle }]}> 
                     <Ionicons name={item.icon} size={16} color={selected ? p.chipActiveText : p.chipIdleText} />
                   </View>
 
