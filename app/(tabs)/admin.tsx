@@ -229,6 +229,7 @@ export default function AdminScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [drawTime, setDrawTime] = useState('9:00 PM');
   const [numbers, setNumbers] = useState('');
+  const [jackpotAmount, setJackpotAmount] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [showGamePicker, setShowGamePicker] = useState(false);
@@ -284,6 +285,7 @@ export default function AdminScreen() {
     const times = firstGame?.drawTime.split(',').map(t => t.trim()) ?? ['9:00 PM'];
     setDrawTime(times[times.length - 1]);
     setNumbers('');
+    setJackpotAmount('');
     setMessage('');
     setShowGamePicker(false);
     setIsFormOpen(true);
@@ -295,6 +297,7 @@ export default function AdminScreen() {
     setDrawDate(new Date(r.drawDateKey + 'T12:00:00'));
     setDrawTime(r.drawTime ?? '9:00 PM');
     setNumbers(r.numbers);
+    setJackpotAmount(r.jackpot?.toString() ?? '');
     setMessage('');
     setShowGamePicker(false);
     setIsFormOpen(true);
@@ -311,7 +314,13 @@ export default function AdminScreen() {
       await apiFetch('/admin/results', {
         method: 'POST',
         userId: session!.userId,
-        body: { gameId, drawDateKey, drawTime, numbers: balls.join(',') },
+        body: { 
+          gameId, 
+          drawDateKey, 
+          drawTime, 
+          numbers: balls.join(','),
+          jackpot: jackpotAmount ? parseInt(jackpotAmount, 10) : undefined
+        },
       });
       setIsFormOpen(false);
       fetchResults();
@@ -609,6 +618,25 @@ export default function AdminScreen() {
                     }, 100);
                   }}
                 />
+
+                {/* Result Specific Jackpot */}
+                <Text style={[s.label, { color: p.textStrong }]}>Draw Jackpot (Optional)</Text>
+                <View style={[s.pickerBtn, { backgroundColor: p.stageBg, borderColor: p.cardBorder, marginTop: 8 }]}>
+                  <TextInput
+                    style={{ flex: 1, color: p.textStrong, fontSize: 15, fontFamily: Fonts.sans }}
+                    keyboardType="number-pad"
+                    placeholder="Enter jackpot for this specific draw"
+                    placeholderTextColor={p.textSoft}
+                    value={jackpotAmount}
+                    onChangeText={setJackpotAmount}
+                    onFocus={() => {
+                      setTimeout(() => {
+                        formScrollRef.current?.scrollToEnd({ animated: true });
+                      }, 100);
+                    }}
+                  />
+                  <Text style={{ color: p.textSoft, fontSize: 12, fontWeight: '700' }}>PHP</Text>
+                </View>
 
                 {message ? <Text style={[s.message, { color: p.warning }]}>{message}</Text> : null}
 

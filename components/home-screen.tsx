@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -29,6 +29,7 @@ type LottoGame = {
   drawDays: string;
   jackpot: number;
   jackpotStatus: string;
+  results?: { drawDateKey: string; numbers: string }[];
 };
 
 type Palette = {
@@ -253,7 +254,7 @@ export default function HomeScreen() {
 
   // Load games — today only
   useEffect(() => {
-    apiFetch<LottoGame[]>('/games')
+    apiFetch<LottoGame[]>('/games/results') // Use results endpoint to get official numbers
       .then(data => {
         setGames(data);
         const today = new Date();
@@ -353,7 +354,17 @@ export default function HomeScreen() {
   const nextDrawLabel = nextDrawAt.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
   const latestSettledDrawAt = getLatestSettledDrawAt(now, gameDrawTime);
   const latestSettledDrawKey = toLocalDateKey(latestSettledDrawAt);
-  const latestOfficialNumbers = selectedGame ? buildOfficialNumbers(selectedGame, latestSettledDrawKey) : [];
+  const latestOfficialNumbers = useMemo(() => {
+    if (!selectedGame) return [];
+    // Priority 1: Check for admin-posted result from the server
+    // (We'll fetch this from the games array which now includes results)
+    const result = selectedGame.results?.find(r => r.drawDateKey === latestSettledDrawKey);
+    if (result) {
+      return result.numbers.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+    }
+    // Fallback: Seeded random generation (existing logic)
+    return buildOfficialNumbers(selectedGame, latestSettledDrawKey);
+  }, [selectedGame, latestSettledDrawKey]);
   const countdownLabel = getCountdownLabel(nextDrawAt, now);
   const selectedBallSet = new Set(selectedNumbers);
 

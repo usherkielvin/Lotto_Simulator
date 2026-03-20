@@ -18,24 +18,44 @@ type ProfileData = {
   balance: number;
 };
 
+type UnclaimedWin = {
+  id: string;
+  gameId: string;
+  gameName: string;
+  drawDateKey: string;
+  numbers: number[];
+  stake: number;
+  payout: number;
+  jackpot?: number | null;
+  officialNumbers?: number[] | null;
+};
+
 type SettingsRoute = '/settings-theme' | '/settings-notifications' | '/funding-history' | '/settings-privacy' | '/settings-help';
 
-const PLAYER_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: SettingsRoute }[] = [
+const PLAYER_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: string }[] = [
   { icon: 'color-palette-outline', label: 'App theme',          route: '/settings-theme' },
   { icon: 'notifications-outline', label: 'Draw notifications', route: '/settings-notifications' },
+  { icon: 'wallet-outline',        label: 'Payouts & History',   route: '/payouts' },
   { icon: 'receipt-outline',       label: 'Funding History',    route: '/funding-history' },
   { icon: 'lock-closed-outline',   label: 'Privacy & data',     route: '/settings-privacy' },
   { icon: 'help-circle-outline',   label: 'Help & support',     route: '/settings-help' },
 ];
 
-const ADMIN_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: SettingsRoute }[] = [
+const ADMIN_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: string }[] = [
   { icon: 'color-palette-outline', label: 'App theme',    route: '/settings-theme' },
+  { icon: 'wallet-outline',        label: 'Payouts & History', route: '/payouts' },
   { icon: 'lock-closed-outline',   label: 'Privacy & data', route: '/settings-privacy' },
   { icon: 'help-circle-outline',   label: 'Help & support', route: '/settings-help' },
 ];
 
 function formatPHP(v: number) {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 }).format(v);
+}
+
+function formatDate(key: string): string {
+  if (!key) return '';
+  const [y, m, d] = key.split('-').map(Number);
+  return `${m}/${d}/${y}`;
 }
 
 function SettingsRow({
@@ -62,20 +82,68 @@ export default function ProfileScreen() {
   const p = usePalette();
   const router = useRouter();
   const { session, signOut } = useSession();
-  const { balance: liveBalance } = useBalance();
+  const { balance: liveBalance, refreshBalance } = useBalance();
   const userId = session?.userId;
   const isAdmin = session?.role === 'admin';
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [unclaimed, setUnclaimed] = useState<UnclaimedWin[]>([]);
   const [loading, setLoading] = useState(true);
+  const [claiming, setClaiming] = useState<string | null>(null);
+
+  const loadData = async () => {
+    if (!userId) { setLoading(false); return; }
+    try {
+      const [p, u] = await Promise.all([
+        apiFetch<ProfileData>('/profile', { userId }),
+        apiFetch<UnclaimedWin[]>('/bets/history', { userId }),
+      ]);
+      setProfile(p);
+      
+      // Filter for unclaimed wins manually from history
+      const unclaimedWins = u.filter(bet => {
+        const winning = bet.officialNumbers ?? [];
+        if (winning.length === 0) return false;
+        
+        const isDigit = ['2d-ez2', '3d-swertres', '4digit', '6digit'].includes(bet.gameId);
+        let matchCount = 0;
+        if (isDigit) {
+          bet.numbers.forEach((n, idx) => { if (winning[idx] === n) matchCount++; });
+        } else {
+          bet.numbers.forEach(n => { if (winning.includes(n)) matchCount++; });
+        }
+
+        const isExactMatch = isDigit && matchCount === bet.numbers.length;
+        const isLottoWin = !isDigit && matchCount >= 3;
+        
+        // Only return if it's a win but payout is still 0 (unclaimed)
+        return (isExactMatch || isLottoWin) && (bet.payout === 0 || bet.payout === null);
+      });
+      
+      setUnclaimed(unclaimedWins);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  };
 
   useEffect(() => {
-    if (!userId) { setLoading(false); return; }
-    apiFetch<ProfileData>('/profile', { userId })
-      .then(setProfile)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    loadData();
   }, [userId]);
+
+  const handleClaim = async (betId: string) => {
+    if (!userId || claiming) return;
+    setClaiming(betId);
+    try {
+      await apiFetch('/bets/claim', {
+        method: 'POST',
+        userId,
+        body: { betId },
+      });
+      // Refresh data
+      await loadData();
+      refreshBalance(); // Update balance
+    } catch { /* ignore */ }
+    finally { setClaiming(null); }
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -152,6 +220,75 @@ export default function ProfileScreen() {
             </>
           )}
         </View>
+
+        {/* Unclaimed Winnings */}
+        {!isAdmin && unclaimed.length > 0 && (
+          <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder, borderLeftWidth: 4, borderLeftColor: p.accent }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <View style={[s.winIconWrap, { backgroundColor: p.accent + '22' }]}>
+                <Ionicons name="trophy" size={20} color={p.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.sectionTitle, { color: p.textStrong, marginBottom: 0 }]}>Collect Winnings</Text>
+                <Text style={[s.sectionSubtitle, { color: p.textSoft }]}>You have {unclaimed.length} unclaimed ticket{unclaimed.length > 1 ? 's' : ''}</Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 10 }}>
+              {unclaimed.map((win) => {
+                const isDigitGame = ['2d-ez2', '3d-swertres', '4digit', '6digit'].includes(win.gameId);
+                const multiplier = isDigitGame ? (win.stake / 10) : 1;
+                
+                // For lotto games (6/42 etc), calculate standard prize if payout is 0
+                let calculatedPrize = 0;
+                if (isDigitGame) {
+                  calculatedPrize = (win.jackpot ?? 0) * multiplier;
+                } else {
+                  // Standard lotto prizes if not a jackpot
+                  const winning = win.officialNumbers ?? [];
+                  let matches = 0;
+                  win.numbers.forEach(n => { if (winning.includes(n)) matches++; });
+                  
+                  if (matches === 6) calculatedPrize = win.jackpot ?? 0;
+                  else if (matches === 5) calculatedPrize = 50000;
+                  else if (matches === 4) calculatedPrize = 1200;
+                  else if (matches === 3) calculatedPrize = 24;
+                }
+
+                const winPayout = (win.payout ?? 0) > 0 ? (win.payout ?? 0) : calculatedPrize;
+
+                return (
+                  <View key={win.id} style={[s.winRow, { backgroundColor: p.stageBg, borderColor: p.cardBorder }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.winGame, { color: p.textStrong }]}>{win.gameName}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                        <Text style={[s.winDate, { color: p.textSoft }]}>{formatDate(win.drawDateKey)}</Text>
+                        <View style={[s.winBadge, { backgroundColor: p.chipIdle }]}>
+                          <Text style={[s.winBadgeText, { color: p.chipIdleText }]}>Stake {formatPHP(win.stake)}</Text>
+                        </View>
+                      </View>
+                      <Text style={[s.winAmount, { color: p.accent }]}>{formatPHP(winPayout)}</Text>
+                    </View>
+                    <Pressable 
+                      style={[s.claimBtn, { backgroundColor: p.accent, opacity: claiming === win.id ? 0.6 : 1 }]}
+                      onPress={() => handleClaim(win.id)}
+                      disabled={claiming !== null}
+                    >
+                      {claiming === win.id ? (
+                        <ActivityIndicator size="small" color={p.accentText} />
+                      ) : (
+                        <>
+                          <Ionicons name="wallet-outline" size={14} color={p.accentText} />
+                          <Text style={[s.claimBtnText, { color: p.accentText }]}>Claim</Text>
+                        </>
+                      )}
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Admin Quick Actions */}
         {isAdmin && (
@@ -236,6 +373,16 @@ const s = StyleSheet.create({
   balanceActionText: { fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono },
   card:          { borderRadius: 16, borderWidth: 1, padding: 14 },
   sectionTitle:  { fontSize: 16, fontWeight: '800', fontFamily: Fonts.rounded, marginBottom: 14 },
+  sectionSubtitle: { fontSize: 12, fontWeight: '500', fontFamily: Fonts.sans, marginTop: 2 },
+  winIconWrap:   { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  winRow:        { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1 },
+  winGame:       { fontSize: 14, fontWeight: '800', fontFamily: Fonts.rounded },
+  winDate:       { fontSize: 11, fontWeight: '500', fontFamily: Fonts.sans, marginTop: 2 },
+  winAmount:     { fontSize: 15, fontWeight: '900', fontFamily: Fonts.mono, marginTop: 4 },
+  winBadge:      { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  winBadgeText:  { fontSize: 9, fontWeight: '700', fontFamily: Fonts.mono },
+  claimBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  claimBtnText:  { fontSize: 13, fontWeight: '800', fontFamily: Fonts.rounded },
   adminActionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   adminActionBtn:   { width: '48.4%', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 12, alignItems: 'center', flexDirection: 'row', gap: 10 },
   adminActionIcon:  { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

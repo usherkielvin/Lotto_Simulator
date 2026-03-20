@@ -23,11 +23,19 @@ interface Ticket {
   status: 'pending' | 'won' | 'lost';
   matches?: number | null;
   payout?: number | null;
+  jackpot?: number | null;
   officialNumbers?: number[] | null;
 }
 
 function formatPHP(v: number) {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 }).format(v);
+}
+
+function formatJackpot(v: number) {
+  if (v >= 1_000_000_000) return `₱${(v / 1_000_000_000).toFixed(1)}B`;
+  if (v >= 1_000_000) return `₱${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `₱${(v / 1_000).toFixed(0)}K`;
+  return formatPHP(v);
 }
 
 function formatDateStr(dateKey: string) {
@@ -38,7 +46,63 @@ function formatDateStr(dateKey: string) {
 
 function formatTicketDrawLabel(ticket: Ticket) {
   const drawTime = ticket.drawTime?.trim();
-  return `Draw: ${formatDateStr(ticket.drawDateKey)} · ${drawTime && drawTime.length > 0 ? drawTime : '9:00 PM'}`;
+  return `${formatDateStr(ticket.drawDateKey)} · ${drawTime && drawTime.length > 0 ? drawTime : '9:00 PM'}`;
+}
+
+/** Same ball style as the Results tab — yellow bg, brown number */
+function NumberBalls({
+  numbers,
+  accent,
+  accentText,
+}: {
+  numbers: number[];
+  accent: string;
+  accentText: string;
+}) {
+  return (
+    <View style={s.ballsRow}>
+      {numbers.map((n, idx) => (
+        <View key={idx} style={[s.ball, { backgroundColor: accent }]}>
+          <Text style={[s.ballText, { color: accentText }]}>{n}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Settled balls — matched = yellow/brown (results style), unmatched = muted */
+function SettledBalls({
+  numbers,
+  officialNumbers,
+  gameId,
+  accent,
+  accentText,
+  mutedBg,
+  mutedText,
+}: {
+  numbers: number[];
+  officialNumbers: number[];
+  gameId: string;
+  accent: string;
+  accentText: string;
+  mutedBg: string;
+  mutedText: string;
+}) {
+  const isDigit = ['2d-ez2', '3d-swertres', '4digit', '6digit'].includes(gameId);
+  return (
+    <View style={s.ballsRow}>
+      {numbers.map((n, idx) => {
+        const hit = isDigit ? officialNumbers[idx] === n : officialNumbers.includes(n);
+        return (
+          <View key={idx} style={[s.ball, { backgroundColor: hit ? accent : mutedBg }]}>
+            <Text style={[s.ballText, { color: hit ? accentText : mutedText, fontWeight: hit ? '900' : '700' }]}>
+              {n}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
 }
 
 function ActiveCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePalette> }) {
@@ -47,26 +111,28 @@ function ActiveCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePal
       <View style={s.cardHead}>
         <View style={{ flex: 1 }}>
           <Text style={[s.cardGame, { color: p.textStrong }]}>{ticket.gameName}</Text>
-          <Text style={[s.cardMeta, { color: p.textSoft  }]}>{formatTicketDrawLabel(ticket)}</Text>
+          <View style={s.metaRow}>
+            <Ionicons name="calendar-outline" size={11} color={p.textSoft} />
+            <Text style={[s.cardMeta, { color: p.textSoft }]}>{formatTicketDrawLabel(ticket)}</Text>
+          </View>
         </View>
-        <View style={[s.badge, { backgroundColor: p.secondaryButton }]}>
-          <Ionicons name="time-outline" size={12} color={p.secondaryButtonText} />
-          <Text style={[s.badgeText, { color: p.secondaryButtonText }]}>PENDING</Text>
+        <View style={[s.badge, { backgroundColor: p.chipIdle }]}>
+          <Ionicons name="time-outline" size={11} color={p.chipIdleText} />
+          <Text style={[s.badgeText, { color: p.chipIdleText }]}>PENDING</Text>
         </View>
       </View>
 
-      <View style={s.ballsRow}>
-        {ticket.numbers.map((n, idx) => (
-          <View key={`${ticket.id}-${n}-${idx}`} style={[s.ball, { backgroundColor: p.stageBg }]}> 
-            <Text style={[s.ballText, { color: p.textStrong }]}>{n}</Text>
-          </View>
-        ))}
-      </View>
+      <NumberBalls numbers={ticket.numbers} accent={p.accent} accentText={p.accentText} />
 
       <View style={s.cardFoot}>
         <Text style={[s.footText, { color: p.textSoft }]}>
           Stake <Text style={[s.footVal, { color: p.textStrong }]}>{formatPHP(ticket.stake)}</Text>
         </Text>
+        {(ticket.jackpot ?? 0) > 0 && (
+          <Text style={[s.footText, { color: p.textSoft }]}>
+            Jackpot <Text style={[s.footVal, { color: p.accent }]}>{formatJackpot(ticket.jackpot!)}</Text>
+          </Text>
+        )}
       </View>
       <Text style={[s.placedAt, { color: p.textSoft }]}>Placed {ticket.placedAt}</Text>
     </View>
@@ -74,60 +140,97 @@ function ActiveCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePal
 }
 
 function HistoryCard({ ticket, p }: { ticket: Ticket; p: ReturnType<typeof usePalette> }) {
-  const won     = (ticket.payout ?? 0) > 0;
   const winning = ticket.officialNumbers ?? [];
+  const isDigit = ['2d-ez2', '3d-swertres', '4digit', '6digit'].includes(ticket.gameId);
   const drawTime = ticket.drawTime?.trim();
 
-  const cardBg  = won ? p.accent              : p.cardBg;
-  const cardTxt = won ? '#3d2800'             : p.textStrong;
-  const cardSub = won ? 'rgba(61,40,0,0.65)' : p.textSoft;
-  const ballBg  = won ? 'rgba(0,0,0,0.12)'   : p.stageBg;
-  const ballTxt = won ? '#3d2800'             : p.textStrong;
-  const badgeBg = won ? 'rgba(0,0,0,0.12)'   : p.chipIdle;
-  const badgeTxt= won ? '#3d2800'             : p.chipIdleText;
+  let matchCount = 0;
+  if (isDigit) {
+    ticket.numbers.forEach((n, idx) => { if (winning[idx] === n) matchCount++; });
+  } else {
+    ticket.numbers.forEach(n => { if (winning.includes(n)) matchCount++; });
+  }
 
-  const iconName: keyof typeof Ionicons.glyphMap =
-    ticket.matches === 6              ? 'trophy'        :
-    (ticket.matches ?? 0) >= 3        ? 'star'          : 'close-circle';
-  const label =
-    ticket.matches === 6              ? 'JACKPOT'                    :
-    (ticket.matches ?? 0) >= 3        ? `${ticket.matches}/6 WIN`    : 'NO MATCH';
+  // Exact match for digit games or status is won
+  const isExactMatch = isDigit && winning.length > 0 && matchCount === ticket.numbers.length;
+  const won = ticket.status === 'won' || (ticket.payout ?? 0) > 0 || isExactMatch;
+  
+  // Calculate multiplier for digit games (stake / 10)
+  const multiplier = isDigit ? (ticket.stake / 10) : 1;
+  const potentialPayout = isExactMatch ? (ticket.jackpot ?? 0) * multiplier : 0;
+  const payout = (ticket.payout ?? 0) > 0 ? (ticket.payout ?? 0) : potentialPayout;
+
+  let iconName: keyof typeof Ionicons.glyphMap;
+  let label: string;
+  let badgeBg: string;
+  let badgeTxt: string;
+
+  if (won) {
+    const isJackpot = !isDigit && matchCount === 6;
+    iconName  = isJackpot ? 'trophy' : 'checkmark-circle';
+    label     = isJackpot ? 'JACKPOT' : (isDigit ? 'WINNER' : `${matchCount}/6 WIN`);
+    badgeBg   = p.accent + '33';
+    badgeTxt  = p.accent;
+  } else if (matchCount > 0) {
+    iconName  = 'star-half';
+    label     = isDigit ? `${matchCount} MATCH` : `${matchCount}/6 MATCH`;
+    badgeBg   = p.chipIdle;
+    badgeTxt  = p.chipIdleText;
+  } else {
+    iconName  = 'close-circle';
+    label     = 'NO MATCH';
+    badgeBg   = p.chipIdle;
+    badgeTxt  = p.chipIdleText;
+  }
 
   return (
-    <View style={[s.card, { backgroundColor: cardBg, borderColor: won ? 'transparent' : p.cardBorder }]}>
+    <View style={[
+      s.card,
+      { backgroundColor: p.cardBg, borderColor: p.cardBorder },
+      won && { borderLeftWidth: 4, borderLeftColor: p.accent },
+    ]}>
       <View style={s.cardHead}>
         <View style={{ flex: 1 }}>
-          <Text style={[s.cardGame, { color: cardTxt }]}>{ticket.gameName}</Text>
-          <Text style={[s.cardMeta, { color: cardSub }]}>{formatDateStr(ticket.drawDateKey)}{drawTime ? ` · ${drawTime}` : ''}</Text>
+          <Text style={[s.cardGame, { color: p.textStrong }]}>{ticket.gameName}</Text>
+          <View style={s.metaRow}>
+            <Ionicons name="calendar-outline" size={11} color={p.textSoft} />
+            <Text style={[s.cardMeta, { color: p.textSoft }]}>
+              {formatDateStr(ticket.drawDateKey)}{drawTime ? ` · ${drawTime}` : ''}
+            </Text>
+          </View>
         </View>
         <View style={[s.badge, { backgroundColor: badgeBg }]}>
-          <Ionicons name={iconName} size={12} color={badgeTxt} />
+          <Ionicons name={iconName} size={11} color={badgeTxt} />
           <Text style={[s.badgeText, { color: badgeTxt }]}>{label}</Text>
         </View>
       </View>
 
-      <View style={s.ballsRow}>
-        {ticket.numbers.map((n, idx) => {
-          const isMatch = (ticket.matches ?? 0) >= 3 && winning.includes(n);
-          return (
-            <View key={`${ticket.id}-${n}-${idx}`} style={[s.ball, { backgroundColor: isMatch ? '#3d2800' : ballBg }, isMatch && s.ballHighlight]}>
-              <Text style={[s.ballText, { color: isMatch ? '#f4b400' : ballTxt, fontWeight: isMatch ? '900' : '700' }]}>{n}</Text>
-            </View>
-          );
-        })}
-      </View>
+      {/* Your numbers */}
+      {winning.length > 0 ? (
+        <SettledBalls
+          numbers={ticket.numbers}
+          officialNumbers={winning}
+          gameId={ticket.gameId}
+          accent={p.accent}
+          accentText={p.accentText}
+          mutedBg={p.stageBg}
+          mutedText={p.textSoft}
+        />
+      ) : (
+        <NumberBalls numbers={ticket.numbers} accent={p.accent} accentText={p.accentText} />
+      )}
 
       <View style={s.cardFoot}>
-        <Text style={[s.footText, { color: cardSub }]}>
-          Stake <Text style={[s.footVal, { color: cardTxt }]}>{formatPHP(ticket.stake)}</Text>
+        <Text style={[s.footText, { color: p.textSoft }]}>
+          Stake <Text style={[s.footVal, { color: p.textStrong }]}>{formatPHP(ticket.stake)}</Text>
         </Text>
-        {won && (
-          <Text style={[s.footText, { color: cardTxt, fontWeight: '800' }]}>
-            Payout <Text style={s.footVal}>{formatPHP(ticket.payout ?? 0)}</Text>
+        {payout > 0 && (
+          <Text style={[s.footText, { color: p.textSoft }]}>
+            Payout <Text style={[s.footVal, { color: p.accent }]}>{formatPHP(payout)}</Text>
           </Text>
         )}
       </View>
-      <Text style={[s.placedAt, { color: cardSub }]}>Placed {ticket.placedAt}</Text>
+      <Text style={[s.placedAt, { color: p.textSoft }]}>Placed {ticket.placedAt}</Text>
     </View>
   );
 }
@@ -166,7 +269,7 @@ export default function TicketsScreen() {
         <View style={[s.orbBottom, { backgroundColor: p.orbTwo }]} />
         <View style={[s.hero, { backgroundColor: p.heroBg, margin: 16, borderRadius: 18 }]}>
           <Text style={[s.heroTag,   { color: 'rgba(255,255,255,0.70)' }]}>LOTTO SIMULATOR</Text>
-          <Text style={[s.heroTitle, { color: '#ffffff' }]}>My Bets</Text>
+          <Text style={[s.heroTitle, { color: '#ffffff' }]}>My Tickets</Text>
           <Text style={[s.heroSub,   { color: 'rgba(255,255,255,0.70)' }]}>Admin account</Text>
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 }}>
@@ -175,7 +278,7 @@ export default function TicketsScreen() {
             Admins don't place bets
           </Text>
           <Text style={[s.heroSub, { color: p.textSoft, textAlign: 'center' }]}>
-            Use the Admin tab to manage draw results and sync PCSO data.
+            Use the Admin tab to manage draw results.
           </Text>
         </View>
       </SafeAreaView>
@@ -183,7 +286,7 @@ export default function TicketsScreen() {
   }
 
   const shown = filter === 'active' ? active : history;
-  const totalWon = history.reduce((s, t) => s + (t.payout ?? 0), 0);
+  const totalWon = history.reduce((sum, t) => sum + (t.payout ?? 0), 0);
 
   return (
     <SafeAreaView style={[s.root, { backgroundColor: p.screenBg }]}>
@@ -220,8 +323,8 @@ export default function TicketsScreen() {
                 onPress={() => setFilter(key)}
                 style={[s.filterTab, isActive && { backgroundColor: p.chipActive }]}
               >
-                <Text style={[s.filterText, { color: isActive ? p.accentText : p.textSoft }]}>
-                  {key === 'active' ? 'Awaiting Draw' : 'Results'}
+                <Text style={[s.filterText, { color: isActive ? p.chipActiveText : p.textSoft }]}>
+                  {key === 'active' ? 'Pending' : 'Settled'}
                 </Text>
               </Pressable>
             );
@@ -270,14 +373,16 @@ const s = StyleSheet.create({
   card:      { borderRadius: 16, borderWidth: 1, padding: 14 },
   cardHead:  { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
   cardGame:  { fontSize: 15, fontWeight: '800', fontFamily: Fonts.rounded },
-  cardMeta:  { fontSize: 11, marginTop: 2, fontFamily: Fonts.sans },
+  metaRow:   { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  cardMeta:  { fontSize: 11, fontFamily: Fonts.mono },
   badge:     { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 5 },
   badgeText: { fontSize: 10, fontWeight: '800', fontFamily: Fonts.mono },
-  ballsRow:  { flexDirection: 'row', gap: 7, marginBottom: 12 },
-  ball:          { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  ballHighlight: { borderWidth: 2, borderColor: '#3d2800' },
-  ballText:      { fontSize: 12, fontFamily: Fonts.mono },
-  cardFoot:  { flexDirection: 'row', gap: 14, marginBottom: 6 },
+  ballsRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  ball:      { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  ballText:  { fontSize: 12, fontWeight: '800', fontFamily: Fonts.mono },
+  officialRow:   { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  officialLabel: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: Fonts.mono, minWidth: 38 },
+  cardFoot:  { flexDirection: 'row', gap: 14, marginTop: 4, marginBottom: 6 },
   footText:  { fontSize: 12, fontFamily: Fonts.sans },
   footVal:   { fontWeight: '700', fontFamily: Fonts.mono },
   placedAt:  { fontSize: 11, fontFamily: Fonts.sans },
