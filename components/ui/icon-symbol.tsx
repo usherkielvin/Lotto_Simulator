@@ -24,6 +24,7 @@ const MAPPING = {
   'trophy.fill': 'emoji-events',
   'star.fill': 'star',
   'gearshape.fill': 'settings',
+  'shield.fill': 'admin-panel-settings',
 } as IconMapping;
 
 /**

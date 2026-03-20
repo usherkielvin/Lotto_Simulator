@@ -220,6 +220,7 @@ export default function HomeScreen() {
   const uid = session?.userId ?? null;
   const displayName = session?.displayName ?? 'Player';
   const isDemoUser = session?.demo ?? false;
+  const isAdmin = session?.role === 'admin';
 
   // Games from API
   const [games, setGames] = useState<LottoGame[]>([]);
@@ -503,6 +504,54 @@ export default function HomeScreen() {
       <View style={[styles.orbBottom, { backgroundColor: palette.orbTwo }]} />
 
       <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Admin Home */}
+        {isAdmin ? (
+          <>
+            <View style={[styles.heroCard, { backgroundColor: palette.heroBg }]}>
+              <View style={styles.heroTopRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.heroTag, { color: 'rgba(255,255,255,0.60)' }]}>LOTTO SIMULATOR</Text>
+                  <Text style={[styles.heroTitle, { color: '#ffffff' }]}>Hi, {displayName}</Text>
+                  <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.55)', marginTop: 4 }]}>
+                    {now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </Text>
+                </View>
+                <View style={[styles.demoBadge, { backgroundColor: 'rgba(244,180,0,0.18)' }]}>
+                  <Ionicons name="shield-checkmark-outline" size={12} color={palette.accent} />
+                  <Text style={[styles.demoBadgeText, { color: palette.accent }]}>Admin</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <Ionicons name="grid-outline" size={20} color={palette.accent} />
+                <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Game Schedule</Text>
+              </View>
+              {gamesLoading ? (
+                <ActivityIndicator color={palette.accent} />
+              ) : (
+                <View style={{ gap: 8 }}>
+                  {games.map(g => {
+                    const available = isGameAvailableToday(g, now);
+                    return (
+                      <View key={g.id} style={[styles.gameChip, { backgroundColor: available ? palette.chipActive : palette.chipIdle, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10 }]}>
+                        <Text style={[styles.gameChipLabel, { color: available ? palette.chipActiveText : palette.chipIdleText }]}>{g.name}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name={available ? 'checkmark-circle' : 'time-outline'} size={13} color={available ? palette.chipActiveText : palette.chipIdleText} />
+                          <Text style={[styles.gameChipSub, { color: available ? palette.chipActiveText : palette.chipIdleText }]}>
+                            {available ? g.drawTime : getNextDrawDate(g, now)}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          </>
+        ) : (
+          <>
         {/* Hero */}
         <View style={[styles.heroCard, { backgroundColor: palette.heroBg }]}>
           {/* Top row: greeting + demo badge */}
@@ -705,6 +754,8 @@ export default function HomeScreen() {
             )}
           </View>
         )}
+
+        {/* Game Picker, Bet Builder, Latest Results */}
 
         {/* Game Picker */}
         <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
@@ -1006,6 +1057,9 @@ export default function HomeScreen() {
             </View>
             <Text style={[styles.resultMeta, { color: palette.textSoft }]}>Your pending bets auto-settle right after the scheduled draw time.</Text>
           </View>
+        )}
+
+          </>
         )}
       </ScrollView>
     </SafeAreaView>

@@ -130,6 +130,7 @@ export default function TicketsScreen() {
   const p = usePalette();
   const { session } = useSession();
   const userId = session?.userId;
+  const isAdmin = session?.role === 'admin';
 
   const [active,  setActive]  = useState<Ticket[]>([]);
   const [history, setHistory] = useState<Ticket[]>([]);
@@ -138,7 +139,7 @@ export default function TicketsScreen() {
   const [filter,  setFilter]  = useState<Filter>('active');
 
   const load = useCallback(() => {
-    if (!userId) { setLoading(false); return; }
+    if (!userId || isAdmin) { setLoading(false); return; }
     setLoading(true);
     setError('');
     Promise.all([
@@ -148,9 +149,32 @@ export default function TicketsScreen() {
       .then(([a, h]) => { setActive(a); setHistory(h); })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load tickets.'))
       .finally(() => setLoading(false));
-  }, [userId]);
+  }, [userId, isAdmin]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  if (isAdmin) {
+    return (
+      <SafeAreaView style={[s.root, { backgroundColor: p.screenBg }]}>
+        <View style={[s.orbTop,    { backgroundColor: p.orbOne }]} />
+        <View style={[s.orbBottom, { backgroundColor: p.orbTwo }]} />
+        <View style={[s.hero, { backgroundColor: p.heroBg, margin: 16, borderRadius: 18 }]}>
+          <Text style={[s.heroTag,   { color: 'rgba(255,255,255,0.70)' }]}>LOTTO SIMULATOR</Text>
+          <Text style={[s.heroTitle, { color: '#ffffff' }]}>My Bets</Text>
+          <Text style={[s.heroSub,   { color: 'rgba(255,255,255,0.70)' }]}>Admin account</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 }}>
+          <Ionicons name="shield-checkmark-outline" size={52} color={p.textSoft} />
+          <Text style={[s.heroTitle, { color: p.textStrong, textAlign: 'center', fontSize: 18 }]}>
+            Admins don't place bets
+          </Text>
+          <Text style={[s.heroSub, { color: p.textSoft, textAlign: 'center' }]}>
+            Use the Admin tab to manage draw results and sync PCSO data.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const shown = filter === 'active' ? active : history;
   const totalWon = history.reduce((s, t) => s + (t.payout ?? 0), 0);

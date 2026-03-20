@@ -5,9 +5,12 @@ import { LiquidTabBar } from '@/components/liquid-tab-bar';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useSession } from '@/hooks/use-session';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { session } = useSession();
+  const isAdmin = session?.role === 'admin';
 
   return (
     <Tabs
@@ -37,8 +40,19 @@ export default function TabLayout() {
         name="tickets"
         options={{
           title: 'My Bets',
+          href: isAdmin ? null : undefined,
           tabBarIcon: ({ color, size }) => (
             <IconSymbol size={size} name="ticket.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="admin"
+        options={{
+          title: 'Results',
+          href: isAdmin ? undefined : null,
+          tabBarIcon: ({ color, size }) => (
+            <IconSymbol size={size} name="trophy.fill" color={color} />
           ),
         }}
       />
