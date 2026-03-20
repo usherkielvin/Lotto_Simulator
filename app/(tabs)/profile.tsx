@@ -17,11 +17,14 @@ type ProfileData = {
   balance: number;
 };
 
-const SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
-  { icon: 'notifications-outline', label: 'Draw notifications' },
-  { icon: 'color-palette-outline', label: 'App theme'          },
-  { icon: 'help-circle-outline',   label: 'Help & support'     },
-  { icon: 'lock-closed-outline',   label: 'Privacy & data'     },
+type SettingsRoute = '/settings-theme' | '/settings-notifications' | '/funding-history' | '/settings-privacy' | '/settings-help';
+
+const SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: SettingsRoute }[] = [
+  { icon: 'color-palette-outline', label: 'App theme',          route: '/settings-theme' },
+  { icon: 'notifications-outline', label: 'Draw notifications', route: '/settings-notifications' },
+  { icon: 'receipt-outline',       label: 'Funding History',    route: '/funding-history' },
+  { icon: 'lock-closed-outline',   label: 'Privacy & data',     route: '/settings-privacy' },
+  { icon: 'help-circle-outline',   label: 'Help & support',     route: '/settings-help' },
 ];
 
 function formatPHP(v: number) {
@@ -87,38 +90,47 @@ export default function ProfileScreen() {
                   <Text style={[s.memberSince, { color: 'rgba(255,255,255,0.70)' }]}>{profile?.memberSince ?? ''}</Text>
                 </View>
               </View>
-              {profile && (
-                <View style={[s.balanceRow, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                  <Text style={[s.balanceLabel, { color: 'rgba(255,255,255,0.70)' }]}>Demo Balance</Text>
-                  <Text style={[s.balanceValue, { color: p.accent }]}>{formatPHP(profile.balance)}</Text>
+              <View style={[s.balanceRow, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+                <Text style={[s.balanceLabel, { color: 'rgba(255,255,255,0.70)' }]}>Demo Balance</Text>
+                <Text style={[s.balanceValue, { color: p.accent }]}>{profile ? formatPHP(profile.balance) : 'Unavailable'}</Text>
+                <View style={[s.balanceDivider, { backgroundColor: 'rgba(255,255,255,0.22)' }]} />
+                <View style={s.balanceActionsRow}>
+                  <Pressable
+                    style={[s.balanceActionBtn, { borderColor: 'rgba(255,255,255,0.32)' }]}
+                    onPress={() => router.push('/deposit')}
+                  >
+                    <Ionicons name="arrow-down-circle-outline" size={16} color="#ffffff" />
+                    <Text style={[s.balanceActionText, { color: '#ffffff' }]}>Deposit</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[s.balanceActionBtn, { borderColor: 'rgba(255,255,255,0.32)' }]}
+                    onPress={() => router.push('/withdraw')}
+                  >
+                    <Ionicons name="arrow-up-circle-outline" size={16} color="#ffffff" />
+                    <Text style={[s.balanceActionText, { color: '#ffffff' }]}>Withdraw</Text>
+                  </Pressable>
                 </View>
-              )}
+              </View>
             </>
           )}
         </View>
 
         <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: p.textStrong }]}>Wallet</Text>
-          <View style={s.actionsRow}>
-            <Pressable style={[s.actionBtn, { backgroundColor: p.chipIdle }]} onPress={() => router.push('/deposit')}>
-              <Ionicons name="arrow-down-circle-outline" size={16} color={p.chipIdleText} />
-              <Text style={[s.actionText, { color: p.chipIdleText }]}>Deposit</Text>
-            </Pressable>
-            <Pressable style={[s.actionBtn, { backgroundColor: p.chipIdle }]} onPress={() => router.push('/withdraw')}>
-              <Ionicons name="arrow-up-circle-outline" size={16} color={p.chipIdleText} />
-              <Text style={[s.actionText, { color: p.chipIdleText }]}>Withdraw</Text>
-            </Pressable>
-          </View>
-          <Pressable style={s.settingsRow} onPress={() => router.push('/funding-history')}>
-            <View style={[s.settingsIconWrap, { backgroundColor: p.chipIdle }]}>
-              <Ionicons name="receipt-outline" size={16} color={p.chipIdleText} />
+          <Text style={[s.sectionTitle, { color: p.textStrong }]}>Settings</Text>
+          {SETTINGS.map(({ icon, label, route }) => (
+            <View key={label}>
+              <Pressable style={s.settingsRow} onPress={() => router.push(route)}>
+                <View style={[s.settingsIconWrap, { backgroundColor: p.chipIdle }]}>
+                  <Ionicons name={icon} size={16} color={p.chipIdleText} />
+                </View>
+                <Text style={[s.settingsLabel, { color: p.textStrong }]}>{label}</Text>
+                <Ionicons name="chevron-forward" size={16} color={p.textSoft} />
+              </Pressable>
+              <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
             </View>
-            <Text style={[s.settingsLabel, { color: p.textStrong }]}>Funding History</Text>
-            <Ionicons name="chevron-forward" size={16} color={p.textSoft} />
-          </Pressable>
+          ))}
           {session.role === 'admin' && (
             <>
-              <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
               <Pressable style={s.settingsRow} onPress={() => router.push('/admin')}>
                 <View style={[s.settingsIconWrap, { backgroundColor: p.chipIdle }]}>
                   <Ionicons name="shield-checkmark-outline" size={16} color={p.chipIdleText} />
@@ -126,25 +138,9 @@ export default function ProfileScreen() {
                 <Text style={[s.settingsLabel, { color: p.textStrong }]}>Admin Panel</Text>
                 <Ionicons name="chevron-forward" size={16} color={p.textSoft} />
               </Pressable>
+              <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
             </>
           )}
-        </View>
-
-        <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
-          <Text style={[s.sectionTitle, { color: p.textStrong }]}>Settings</Text>
-          {SETTINGS.map(({ icon, label }, i) => (
-            <View key={label}>
-              <Pressable style={s.settingsRow}>
-                <View style={[s.settingsIconWrap, { backgroundColor: p.chipIdle }]}>
-                  <Ionicons name={icon} size={16} color={p.chipIdleText} />
-                </View>
-                <Text style={[s.settingsLabel, { color: p.textStrong }]}>{label}</Text>
-                <Ionicons name="chevron-forward" size={16} color={p.textSoft} />
-              </Pressable>
-              {i < SETTINGS.length - 1 && <View style={[s.divider, { backgroundColor: p.cardBorder }]} />}
-            </View>
-          ))}
-          <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
           <Pressable style={s.settingsRow} onPress={handleSignOut}>
             <View style={[s.settingsIconWrap, { backgroundColor: '#fee2e2' }]}>
               <Ionicons name="exit-outline" size={16} color="#dc2626" />
@@ -175,11 +171,20 @@ const s = StyleSheet.create({
   balanceRow:    { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
   balanceLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, fontFamily: Fonts.mono },
   balanceValue:  { fontSize: 22, fontWeight: '800', fontFamily: Fonts.rounded, marginTop: 4 },
+  balanceDivider: { height: StyleSheet.hairlineWidth, marginVertical: 10 },
+  balanceActionsRow: { flexDirection: 'row', gap: 8 },
+  balanceActionBtn: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  balanceActionText: { fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono },
   card:          { borderRadius: 16, borderWidth: 1, padding: 14 },
   sectionTitle:  { fontSize: 16, fontWeight: '800', fontFamily: Fonts.rounded, marginBottom: 14 },
-  actionsRow:    { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  actionBtn:     { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  actionText:    { fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono },
   settingsRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   settingsIconWrap: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   settingsLabel:    { flex: 1, fontSize: 14, fontWeight: '600', fontFamily: Fonts.sans },
