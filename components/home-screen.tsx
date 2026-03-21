@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -29,7 +29,7 @@ type LottoGame = {
   drawDays: string;
   jackpot: number;
   jackpotStatus: string;
-  results?: { drawDateKey: string; numbers: string }[];
+  results?: { drawDateKey: string; drawTime: string; numbers: string; winners?: number; jackpot?: number }[];
 };
 
 type Palette = {
@@ -368,6 +368,12 @@ export default function HomeScreen() {
   const countdownLabel = getCountdownLabel(nextDrawAt, now);
   const selectedBallSet = new Set(selectedNumbers);
 
+  // Betting is closed from 9:00 PM to 7:00 AM
+  const isBettingClosed = (() => {
+    const h = now.getHours();
+    return h >= 21 || h < 7;
+  })();
+
   const palette: Palette = colorScheme === 'dark'
     ? {
         screenBg: '#08152c', cardBg: '#0f2344', cardBorder: '#23477e', heroBg: '#0d3a78',
@@ -674,8 +680,143 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Jackpot Showcase */}
+        {/* Jackpot Showcase (daytime) / Latest Results Carousel (night) */}
         {!gamesLoading && majorGames.length > 0 && (
+          isBettingClosed ? (() => {
+            const todayKey = toLocalDateKey(now);
+            const nightGames = majorGames.filter(g => isGameAvailableToday(g, now) && (g.results ?? []).some(r => r.drawDateKey === todayKey));
+            if (nightGames.length === 0) return null;
+            return (
+            /* ── Night mode: same slide design, latest drawn numbers + jackpot ── */
+            <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+              <View style={styles.jackpotHeader}>
+                <View>
+                  <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Latest Draw Results</Text>
+                  <Text style={[styles.jackpotSubtitle, { color: palette.textSoft }]}>
+                    {now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </Text>
+                </View>
+                <View style={[styles.jackpotDrawBadge, { backgroundColor: palette.chipIdle }]}>
+                  <Ionicons name="checkmark-circle-outline" size={11} color={palette.chipIdleText} />
+                  <Text style={[styles.jackpotDrawBadgeText, { color: palette.chipIdleText }]}>Drawn</Text>
+                </View>
+              </View>
+              <ScrollView
+                ref={jackpotScroll}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={SNAP_INTERVAL}
+                decelerationRate="fast"
+                scrollEventThrottle={16}
+                onScroll={e => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / SNAP_INTERVAL);
+                  const clamped = Math.max(0, Math.min(idx, majorGames.length - 1));
+                  if (clamped !== jackpotIndex) {
+                    setJackpotIndex(clamped);
+                    Animated.spring(dotAnim, { toValue: clamped, useNativeDriver: false, speed: 20, bounciness: 0 }).start();
+                  }
+                }}
+                style={{ marginTop: 10 }}
+                contentContainerStyle={{ paddingHorizontal: CAROUSEL_PADDING }}
+              >
+                {majorGames.filter(g => {
+                  const todayKey = toLocalDateKey(now);
+                  return isGameAvailableToday(g, now) && (g.results ?? []).some(r => r.drawDateKey === todayKey);
+                }).map(g => {
+                  const todayKey = toLocalDateKey(now);
+                  const latest = (g.results ?? []).find(r => r.drawDateKey === todayKey) ?? g.results?.[0];
+                  const nums = latest ? latest.numbers.split(',').map(s => parseInt(s.trim(), 10)) : [];
+                  const drawDayNames = g.drawDays
+                    ? g.drawDays.split(',').map(d => {
+                        const n = parseInt(d.trim(), 10);
+                        return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][n] ?? d.trim();
+                      }).join(' · ')
+                    : '';
+                  return (
+                    <View key={g.id} style={[styles.jackpotSlide, { backgroundColor: palette.stageBg, borderColor: palette.cardBorder, borderWidth: 1 }]}>
+                      {/* Game name + date pill — same as jackpot slide top */}
+                      <View style={styles.jackpotSlideTop}>
+                        <Text style={[styles.jackpotGameName, { color: palette.textSoft }]}>{g.name}</Text>
+                        {latest && (
+                          <View style={[styles.jackpotActivePill, { backgroundColor: palette.accent }]}>
+                            <Text style={[styles.jackpotActivePillText, { color: palette.accentText }]}>
+                              {latest.drawDateKey ? new Date(latest.drawDateKey + 'T12:00:00').toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) : ''}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Drawn numbers where jackpot amount normally sits */}
+                      {nums.length > 0 ? (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                          {nums.map((n, i) => (
+                            <View key={i} style={[styles.officialBall, { backgroundColor: palette.secondaryButton }]}>
+                              <Text style={[styles.officialBallText, { color: palette.secondaryButtonText }]}>{n}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={[styles.jackpotAmount, { color: palette.textSoft, fontSize: 16 }]}>No result yet</Text>
+                      )}
+                      <Text style={[styles.jackpotLabel, { color: palette.textSoft }]}>
+                        {latest ? `${latest.drawTime} Draw` : 'Awaiting result'}
+                      </Text>
+
+                      {/* Divider */}
+                      <View style={[styles.jackpotSlideDivider, { backgroundColor: palette.cardBorder }]} />
+
+                      {/* Schedule row */}
+                      <View style={styles.jackpotDetailsRow}>
+                        <View style={styles.jackpotDetailItem}>
+                          <Ionicons name="calendar-outline" size={12} color={palette.textSoft} />
+                          <Text style={[styles.jackpotDetailText, { color: palette.textSoft }]}>{drawDayNames}</Text>
+                        </View>
+                      </View>
+
+                      {/* Jackpot + single status */}
+                      <Text style={[styles.jackpotAmount, { color: palette.accent }]}>
+                        {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(g.jackpot)}
+                      </Text>
+                      {(latest?.winners ?? 0) > 0 ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                          <Ionicons name="trophy" size={12} color={palette.accent} />
+                          <Text style={[styles.jackpotStatus, { color: palette.accent, marginBottom: 0 }]}>
+                            {latest!.winners} {latest!.winners === 1 ? 'winner' : 'winners'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={[styles.jackpotStatus, { color: palette.textSoft }]}>Accumulating</Text>
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+              {/* Dot indicators */}
+              {(() => {
+                const todayKey = toLocalDateKey(now);
+                const nightGames = majorGames.filter(g => isGameAvailableToday(g, now) && (g.results ?? []).some(r => r.drawDateKey === todayKey));
+                return nightGames.length > 1 && (
+                  <View style={styles.dotRow}>
+                    {nightGames.map((_, i) => {
+                      const width = dotAnim.interpolate({
+                        inputRange: nightGames.map((__, j) => j),
+                        outputRange: nightGames.map((__, j) => (j === i ? 18 : 7)),
+                        extrapolate: 'clamp',
+                      });
+                      const opacity = dotAnim.interpolate({
+                        inputRange: nightGames.map((__, j) => j),
+                        outputRange: nightGames.map((__, j) => (j === i ? 1 : 0.35)),
+                        extrapolate: 'clamp',
+                      });
+                      return <Animated.View key={i} style={[styles.dot, { backgroundColor: palette.accent, width, opacity }]} />;
+                    })}
+                  </View>
+                );
+              })()}
+            </View>
+          );
+          })() : (
+          /* ── Day mode: jackpot showcase ── */
           <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
             {/* Header */}
             <View style={styles.jackpotHeader}>
@@ -771,9 +912,20 @@ export default function HomeScreen() {
                     </View>
 
                     {/* Status */}
-                    <Text style={[styles.jackpotStatus, { color: palette.warning }]} numberOfLines={1}>
-                      {g.jackpotStatus}
-                    </Text>
+                    {(() => {
+                      const latestResult = g.results?.[0];
+                      const w = latestResult?.winners ?? 0;
+                      return w > 0 ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 14 }}>
+                          <Ionicons name="trophy" size={12} color={palette.accent} />
+                          <Text style={[styles.jackpotStatus, { color: palette.accent, marginBottom: 0 }]}>
+                            {w} {w === 1 ? 'winner' : 'winners'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text style={[styles.jackpotStatus, { color: palette.textSoft }]}>Accumulating</Text>
+                      );
+                    })()}
 
                     {/* Buy Tickets / Next draw */}
                     {availableToday ? (
@@ -823,10 +975,138 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
+          ) /* end day-mode jackpot */
         )}
 
-        {/* Game Picker, Bet Builder, Latest Results */}
+        {/* Small Games Night Showcase — split: 4D/6D and daily 3D/2D */}
+        {isBettingClosed && !gamesLoading && (() => {
+          const todayKey = toLocalDateKey(now);
+          const toHour = (t: string) => {
+            const m = t.match(/(\d+):(\d+)\s*(AM|PM)/i);
+            if (!m) return 0;
+            let h = parseInt(m[1], 10);
+            if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+            if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+            return h;
+          };
 
+          const hasResult = (g: LottoGame) =>
+            isGameAvailableToday(g, now) && (g.results ?? []).some(r => r.drawDateKey === todayKey);
+
+          const bigDigit  = smallGames.filter(g => (g.id === '6digit' || g.id === '4digit') && hasResult(g));
+          const dailyDraw = smallGames.filter(g => (g.id === '3d-swertres' || g.id === '2d-ez2') && hasResult(g));
+
+          const renderGame = (g: LottoGame, gi: number, total: number) => {
+            const todayDraws = (g.results ?? [])
+              .filter(r => r.drawDateKey === todayKey)
+              .sort((a, b) => toHour(a.drawTime) - toHour(b.drawTime));
+            return (
+              <View key={g.id}
+                style={[
+                  { paddingVertical: 12 },
+                  gi > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.cardBorder },
+                ]}
+              >
+                <Text style={[styles.jackpotGameName, { color: palette.textStrong, fontSize: 13, marginBottom: 10 }]}>{g.name}</Text>
+                {todayDraws.map((r, di) => {
+                  const nums = r.numbers.split(',').map(s => parseInt(s.trim(), 10));
+                  const drawJackpot = r.jackpot ?? g.jackpot;
+                  return (
+                    <View key={`${r.drawDateKey}-${r.drawTime}`}
+                      style={[
+                        { paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+                        di > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.cardBorder },
+                      ]}
+                    >
+                      {/* Left: time pill + drawn balls */}
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <View style={[styles.jackpotActivePill, { backgroundColor: palette.chipIdle, alignSelf: 'flex-start' }]}>
+                          <Text style={[styles.jackpotActivePillText, { color: palette.chipIdleText }]}>{r.drawTime}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 5, flexWrap: 'wrap' }}>
+                          {nums.map((n, i) => (
+                            <View key={i} style={[styles.historyBall, { backgroundColor: palette.secondaryButton }]}>
+                              <Text style={[styles.historyBallText, { color: palette.secondaryButtonText }]}>{n}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+
+                      {/* Right: jackpot + status */}
+                      <View style={{ alignItems: 'flex-end', gap: 3 }}>
+                        <Text style={[styles.jackpotAmount, { color: palette.accent, fontSize: 16, marginBottom: 0 }]}>
+                          {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(drawJackpot)}
+                        </Text>
+                        {(r.winners ?? 0) > 0 ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Ionicons name="trophy" size={10} color={palette.accent} />
+                            <Text style={[styles.jackpotActivePillText, { color: palette.accent }]}>
+                              {r.winners} {r.winners === 1 ? 'winner' : 'winners'}
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text style={[styles.jackpotActivePillText, { color: palette.textSoft }]}>Accumulating</Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          };
+
+          return (
+            <>
+              {/* 4D / 6D — scheduled draws */}
+              {bigDigit.length > 0 && (
+                <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+                  <View style={styles.jackpotHeader}>
+                    <View>
+                      <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>4D / 6D Results</Text>
+                      <Text style={[styles.jackpotSubtitle, { color: palette.textSoft }]}>
+                        {now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+                      </Text>
+                    </View>
+                    <View style={[styles.jackpotDrawBadge, { backgroundColor: palette.chipIdle }]}>
+                      <Ionicons name="grid-outline" size={11} color={palette.chipIdleText} />
+                      <Text style={[styles.jackpotDrawBadgeText, { color: palette.chipIdleText }]}>Drawn</Text>
+                    </View>
+                  </View>
+                  {bigDigit.map((g, gi) => renderGame(g, gi, bigDigit.length))}
+                </View>
+              )}
+
+              {/* 3D / 2D — daily multi-draw */}
+              {dailyDraw.length > 0 && (
+                <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+                  <View style={styles.jackpotHeader}>
+                    <View>
+                      <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>3D / 2D Results</Text>
+                      <Text style={[styles.jackpotSubtitle, { color: palette.textSoft }]}>2PM · 5PM · 9PM draws</Text>
+                    </View>
+                    <View style={[styles.jackpotDrawBadge, { backgroundColor: palette.chipIdle }]}>
+                      <Ionicons name="apps-outline" size={11} color={palette.chipIdleText} />
+                      <Text style={[styles.jackpotDrawBadgeText, { color: palette.chipIdleText }]}>Daily</Text>
+                    </View>
+                  </View>
+                  {dailyDraw.map((g, gi) => renderGame(g, gi, dailyDraw.length))}
+                </View>
+              )}
+            </>
+          );
+        })()}
+
+        {/* Game Picker + Bet Builder — hidden during maintenance window */}
+        {isBettingClosed ? (
+          <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder, alignItems: 'center', paddingVertical: 28 }]}>
+            <Ionicons name="moon-outline" size={36} color={palette.textSoft} />
+            <Text style={[styles.sectionTitle, { color: palette.textStrong, marginTop: 12, textAlign: 'center' }]}>Betting Closed</Text>
+            <Text style={[styles.resultMeta, { color: palette.textSoft, textAlign: 'center', marginTop: 6 }]}>
+              Betting is unavailable from 9:00 PM to 7:00 AM.{'\n'}Come back after 7:00 AM to place your bets.
+            </Text>
+          </View>
+        ) : (
+          <>
         {/* Game Picker */}
         <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
           <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Choose Lotto Game</Text>
@@ -1115,20 +1395,7 @@ export default function HomeScreen() {
           <Text style={[styles.noticeText, { color: palette.warning }]}>{notice}</Text>
         </Animated.View>
 
-        {/* Latest Official Numbers */}
-        {selectedGame && (
-          <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
-            <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Latest Official {latestSettledDrawAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })} Result</Text>
-            <Text style={[styles.resultMeta, { color: palette.textSoft }]}>{selectedGame.name} - {latestSettledDrawKey}</Text>
-            <View style={[styles.officialRow, { backgroundColor: palette.stageBg }]}>
-              {latestOfficialNumbers.map((v, idx) => (
-                <View key={`official-${idx}`} style={[styles.officialBall, { backgroundColor: palette.secondaryButton }]}>
-                  <Text style={[styles.officialBallText, { color: palette.secondaryButtonText }]}>{v}</Text>
-                </View>
-              ))}
-            </View>
-            <Text style={[styles.resultMeta, { color: palette.textSoft }]}>Your pending bets auto-settle right after the scheduled draw time.</Text>
-          </View>
+          </>
         )}
 
           </>
@@ -1231,5 +1498,12 @@ const styles = StyleSheet.create({
   gameScheduleTime: { fontSize: 12, fontWeight: '600', fontFamily: Fonts.mono },
   gameScheduleBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   gameScheduleBadgeText: { fontSize: 10, fontWeight: '800', fontFamily: Fonts.mono },
+  // Draw history
+  historySlide:    { borderRadius: 14, padding: 12, width: 160 },
+  historyDate:     { fontSize: 11, fontWeight: '700', fontFamily: Fonts.mono },
+  historyTime:     { fontSize: 10, fontWeight: '500', fontFamily: Fonts.mono, marginBottom: 8 },
+  historyBalls:    { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  historyBall:     { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  historyBallText: { fontSize: 11, fontWeight: '800', fontFamily: Fonts.rounded },
 });
 

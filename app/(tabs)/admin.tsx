@@ -58,6 +58,7 @@ type OfficialResult = {
   drawTime: string;
   numbers: string;
   jackpot?: number;
+  winners?: number;
 };
 
 // ─── Number Ball Input ────────────────────────────────────────────────────────
@@ -195,7 +196,7 @@ function ResultCard({
         </View>
       </View>
 
-      {/* Right: jackpot badge + actions */}
+      {/* Right: jackpot badge + winners + actions */}
       <View style={rc.rightCol}>
         {result.jackpot != null ? (
           <View style={[rc.jackpotBadge, { 
@@ -207,6 +208,16 @@ function ResultCard({
           </View>
         ) : (
           <View style={{ height: 22 }} />
+        )}
+        {(result.winners ?? 0) > 0 ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+            <Ionicons name="trophy" size={10} color={p.accent} />
+            <Text style={[rc.badgeText, { color: p.accent }]}>
+              winners: {result.winners}
+            </Text>
+          </View>
+        ) : (
+          <Text style={[rc.badgeText, { color: p.textSoft }]}>Accumulating</Text>
         )}
         <View style={rc.actions}>
           <Pressable onPress={onEdit} style={[rc.iconBtn, { backgroundColor: p.chipIdle }]}>
@@ -254,6 +265,7 @@ export default function AdminScreen() {
   const [drawTime, setDrawTime] = useState('9:00 PM');
   const [numbers, setNumbers] = useState('');
   const [jackpotAmount, setJackpotAmount] = useState('');
+  const [winnersCount, setWinnersCount] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [showGamePicker, setShowGamePicker] = useState(false);
@@ -312,6 +324,7 @@ export default function AdminScreen() {
     setDrawTime(times[times.length - 1]);
     setNumbers('');
     setJackpotAmount('');
+    setWinnersCount('');
     setMessage('');
     setShowGamePicker(false);
     setIsFormOpen(true);
@@ -324,6 +337,7 @@ export default function AdminScreen() {
     setDrawTime(r.drawTime ?? '9:00 PM');
     setNumbers(r.numbers);
     setJackpotAmount(r.jackpot != null ? Number(r.jackpot).toLocaleString('en-US') : '');
+    setWinnersCount(r.winners != null ? String(r.winners) : '');
     setMessage('');
     setShowGamePicker(false);
     setIsFormOpen(true);
@@ -345,7 +359,8 @@ export default function AdminScreen() {
           drawDateKey, 
           drawTime, 
           numbers: balls.join(','),
-          jackpot: stripJackpotInput(jackpotAmount)
+          jackpot: stripJackpotInput(jackpotAmount),
+          winners: winnersCount ? parseInt(winnersCount, 10) : undefined,
         },
       });
       setIsFormOpen(false);
@@ -376,7 +391,7 @@ export default function AdminScreen() {
     if (!manualData.trim()) return;
     setImporting(true);
     try {
-      const data = await apiFetch<{ imported: number; skipped: number }>('/admin/import', {
+      const data = await apiFetch<{ imported: number; skipped: number; winners: number }>('/admin/import', {
         method: 'POST',
         userId: session!.userId,
         body: { text: manualData },
@@ -384,7 +399,7 @@ export default function AdminScreen() {
       setManualData('');
       setImportVisible(false);
       fetchResults();
-      Alert.alert('Import Complete', `Imported: ${data.imported}  Skipped: ${data.skipped}`);
+      Alert.alert('Import Complete', `Imported: ${data.imported}  Skipped: ${data.skipped}${data.winners > 0 ? `\nWinners settled: ${data.winners}` : ''}`);
     } catch (e: unknown) {
       Alert.alert('Import Failed', e instanceof Error ? e.message : 'Unknown error');
     } finally {
@@ -673,6 +688,25 @@ export default function AdminScreen() {
                     {formatJackpot(stripJackpotInput(jackpotAmount) ?? 0)}
                   </Text>
                 ) : null}
+
+                {/* Winners Count */}
+                <Text style={[s.label, { color: p.textStrong }]}>Winners (Optional)</Text>
+                <View style={[s.pickerBtn, { backgroundColor: p.stageBg, borderColor: p.cardBorder, marginTop: 8 }]}>
+                  <TextInput
+                    style={{ flex: 1, color: p.textStrong, fontSize: 15, fontFamily: Fonts.mono }}
+                    keyboardType="number-pad"
+                    placeholder="0"
+                    placeholderTextColor={p.textSoft}
+                    value={winnersCount}
+                    onChangeText={v => setWinnersCount(v.replace(/[^0-9]/g, ''))}
+                    onFocus={() => {
+                      setTimeout(() => {
+                        formScrollRef.current?.scrollToEnd({ animated: true });
+                      }, 100);
+                    }}
+                  />
+                  <Ionicons name="trophy-outline" size={14} color={p.textSoft} />
+                </View>
 
                 {message ? <Text style={[s.message, { color: p.warning }]}>{message}</Text> : null}
 

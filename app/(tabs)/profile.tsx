@@ -197,9 +197,9 @@ export default function ProfileScreen() {
                       </View>
                     )}
                   </View>
-                  {!isAdmin && (
+                  {!isAdmin && profile?.memberSince && (
                     <Text style={[s.memberSince, { color: 'rgba(255,255,255,0.65)' }]}>
-                      Member since {profile?.memberSince || 'March 20, 2026'}
+                      Member since {profile.memberSince}
                     </Text>
                   )}
                 </View>
