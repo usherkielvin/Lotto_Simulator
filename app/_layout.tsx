@@ -47,6 +47,8 @@ function RootLayoutNav() {
       <Stack.Screen name="settings-help" />
       <Stack.Screen name="settings-privacy" />
       <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="change-password" />
+      <Stack.Screen name="about" />
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
     </Stack>
   );

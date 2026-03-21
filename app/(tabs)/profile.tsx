@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -30,22 +30,26 @@ type UnclaimedWin = {
   officialNumbers?: number[] | null;
 };
 
-type SettingsRoute = '/settings-theme' | '/settings-notifications' | '/payouts' | '/funding-history' | '/settings-privacy' | '/settings-help';
+type SettingsRoute = '/settings-theme' | '/settings-notifications' | '/payouts' | '/funding-history' | '/settings-privacy' | '/settings-help' | '/change-password' | '/about';
 
 const PLAYER_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: SettingsRoute }[] = [
-  { icon: 'color-palette-outline', label: 'App theme',          route: '/settings-theme' },
-  { icon: 'notifications-outline', label: 'Draw notifications', route: '/settings-notifications' },
-  { icon: 'wallet-outline',        label: 'Payouts & History',  route: '/payouts' },
+  { icon: 'contrast-outline',      label: 'Appearance',           route: '/settings-theme' },
+  { icon: 'notifications-outline', label: 'Notifications',  route: '/settings-notifications' },
+  { icon: 'cash-outline',          label: 'Payouts',  route: '/payouts' },
   { icon: 'receipt-outline',       label: 'Funding History',    route: '/funding-history' },
-  { icon: 'lock-closed-outline',   label: 'Privacy & data',     route: '/settings-privacy' },
-  { icon: 'help-circle-outline',   label: 'Help & support',     route: '/settings-help' },
+  { icon: 'key-outline',           label: 'Change Password',     route: '/change-password' },
+  { icon: 'lock-closed-outline',   label: 'Privacy & Data',      route: '/settings-privacy' },
+  { icon: 'help-circle-outline',   label: 'Help & Support',      route: '/settings-help' },
+  { icon: 'information-circle-outline', label: 'About',          route: '/about' },
 ];
 
 const ADMIN_SETTINGS: { icon: keyof typeof Ionicons.glyphMap; label: string; route: SettingsRoute }[] = [
-  { icon: 'color-palette-outline', label: 'App theme',       route: '/settings-theme' },
-  { icon: 'wallet-outline',        label: 'Payouts & History', route: '/payouts' },
-  { icon: 'lock-closed-outline',   label: 'Privacy & data',  route: '/settings-privacy' },
-  { icon: 'help-circle-outline',   label: 'Help & support',  route: '/settings-help' },
+  { icon: 'contrast-outline',      label: 'Appearance',      route: '/settings-theme' },
+  { icon: 'cash-outline',          label: 'Payouts', route: '/payouts' },
+  { icon: 'key-outline',           label: 'Change Password', route: '/change-password' },
+  { icon: 'lock-closed-outline',   label: 'Privacy & Data',  route: '/settings-privacy' },
+  { icon: 'help-circle-outline',   label: 'Help & Support',  route: '/settings-help' },
+  { icon: 'information-circle-outline', label: 'About',      route: '/about' },
 ];
 
 function formatPHP(v: number) {
@@ -118,7 +122,7 @@ export default function ProfileScreen() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { loadData(); }, [userId]);
+  useFocusEffect(useCallback(() => { loadData(); }, [userId]));
 
   const handleClaim = async (betId: string) => {
     if (!userId || claiming) return;
@@ -189,10 +193,13 @@ export default function ProfileScreen() {
                   </View>
                   {!isAdmin && profile?.memberSince && (
                     <Text style={[s.memberSince, { color: 'rgba(255,255,255,0.60)' }]}>
-                      Member since {profile.memberSince}
+                      @{session.username} · Member since {profile.memberSince}
                     </Text>
                   )}
                 </View>
+                <Pressable onPress={() => router.push('/edit-profile' as never)} style={s.editBtn} hitSlop={8}>
+                  <Ionicons name="pencil-outline" size={16} color="rgba(255,255,255,0.70)" />
+                </Pressable>
               </View>
 
               {/* Balance + actions — players only */}
@@ -362,6 +369,7 @@ const s = StyleSheet.create({
   hero:          { borderRadius: 20, padding: 18, overflow: 'hidden' },
   heroTag:       { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', fontFamily: Fonts.mono, marginBottom: 16 },
   avatarRow:     { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  editBtn:       { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   avatar:        { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { fontSize: 24, fontWeight: '800', fontFamily: Fonts.rounded },
   playerName:    { fontSize: 19, fontWeight: '800', fontFamily: Fonts.rounded },
