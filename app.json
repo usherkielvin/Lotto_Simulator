@@ -54,6 +54,12 @@
         {
           "faceIDPermission": "Allow Lotto Simulator to use Face ID for sign-in."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Lotto Simulator to access your photos to set a profile picture."
+        }
       ]
     ],
     "experiments": {

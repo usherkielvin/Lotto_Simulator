@@ -44,9 +44,9 @@ export default function HelpSettingsScreen() {
   const supportEmailLink = useMemo(() => {
     const subject = encodeURIComponent('Lotto Simulator Support');
     const body = encodeURIComponent(
-      `Hi Ashcol Support,\n\nI need help with Lotto Simulator.\n\nUsername: ${session?.username ?? 'guest'}\nDisplay Name: ${session?.displayName ?? 'N/A'}\n`,
+      `Hi,\n\nI need help with Lotto Simulator.\n\nUsername: ${session?.username ?? 'guest'}\nDisplay Name: ${session?.displayName ?? 'N/A'}\n`,
     );
-    return `mailto:support@ashcol.app?subject=${subject}&body=${body}`;
+    return `mailto:ponce.usher@gmail.com?subject=${subject}&body=${body}`;
   }, [session?.displayName, session?.username]);
 
   const contactSupport = async () => {

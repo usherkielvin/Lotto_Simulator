@@ -110,6 +110,7 @@ type SessionResult = {
   displayName: string;
   role: string;
   demo: boolean;
+  avatarUrl?: string | null;
 };
 
 export default function LoginScreen() {
@@ -198,6 +199,7 @@ export default function LoginScreen() {
       displayName: session.displayName,
       role: session.role,
       demo: session.demo,
+      avatarUrl: session.avatarUrl ?? null,
     });
     router.replace('/(tabs)' as never);
   };

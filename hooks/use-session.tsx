@@ -7,6 +7,7 @@ export type Session = {
   displayName: string;
   role: string;
   demo: boolean;
+  avatarUrl?: string | null;
 };
 
 type SessionCtx = {

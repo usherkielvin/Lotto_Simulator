@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
@@ -176,9 +176,13 @@ export default function ProfileScreen() {
             <>
               {/* Avatar + name */}
               <View style={s.avatarRow}>
-                <View style={[s.avatar, { backgroundColor: p.accent }]}>
-                  <Text style={[s.avatarInitial, { color: p.accentText }]}>{initial}</Text>
-                </View>
+                {session.avatarUrl ? (
+                  <Image source={{ uri: session.avatarUrl }} style={[s.avatar, { borderRadius: 29 }]} />
+                ) : (
+                  <View style={[s.avatar, { backgroundColor: p.accent }]}>
+                    <Text style={[s.avatarInitial, { color: p.accentText }]}>{initial}</Text>
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <Text style={[s.playerName, { color: '#ffffff' }]} numberOfLines={1}>

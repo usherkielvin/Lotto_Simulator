@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -29,6 +31,8 @@ export default function EditProfileScreen() {
 
   const [displayName, setDisplayName] = useState(session?.displayName ?? '');
   const [username,    setUsername]    = useState(session?.username ?? '');
+  const [avatarUri,   setAvatarUri]   = useState<string | null>(session?.avatarUrl ?? null);
+  const [avatarDirty, setAvatarDirty] = useState(false);
   const [busy,  setBusy]  = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
@@ -41,8 +45,42 @@ export default function EditProfileScreen() {
   }, []);
 
   const isDirty =
+    avatarDirty ||
     displayName.trim() !== (session?.displayName ?? '').trim() ||
     username.trim().toLowerCase() !== (session?.username ?? '').toLowerCase();
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow access to your photo library to change your profile picture.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const base64 = asset.base64;
+      const mimeType = asset.mimeType ?? 'image/jpeg';
+      if (base64) {
+        setAvatarUri(`data:${mimeType};base64,${base64}`);
+        setAvatarDirty(true);
+        setError('');
+        setSaved(false);
+      }
+    }
+  };
+
+  const removeAvatar = () => {
+    Alert.alert('Remove photo?', 'Your profile picture will be removed.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => { setAvatarUri(null); setAvatarDirty(true); setSaved(false); } },
+    ]);
+  };
 
   const handleSave = async () => {
     const trimmedName = displayName.trim();
@@ -59,13 +97,21 @@ export default function EditProfileScreen() {
     setBusy(true);
     setError('');
     try {
-      const res = await apiFetch<{ displayName: string; username: string }>('/profile', {
+      const body: Record<string, string> = {
+        displayName: trimmedName,
+        username: trimmedUser,
+      };
+      if (avatarDirty) {
+        body.avatarUrl = avatarUri ?? '';
+      }
+
+      const res = await apiFetch<{ displayName: string; username: string; avatarUrl?: string | null }>('/profile', {
         method: 'PUT',
         userId,
-        body: { displayName: trimmedName, username: trimmedUser },
+        body,
       });
       if (session) {
-        await signIn({ ...session, displayName: res.displayName, username: res.username });
+        await signIn({ ...session, displayName: res.displayName, username: res.username, avatarUrl: res.avatarUrl ?? null });
       }
       setSaved(true);
       setTimeout(() => router.back(), 800);
@@ -105,7 +151,7 @@ export default function EditProfileScreen() {
           style={[s.saveBtn, { opacity: busy || !isDirty ? 0.4 : 1 }]}
         >
           {busy
-            ? <ActivityIndicator size="small" color={p.accent} />
+            ? <ActivityIndicator size="small" color={p.secondaryButton} />
             : <Text style={[s.saveBtnText, { color: p.secondaryButton }]}>Save</Text>
           }
         </Pressable>
@@ -113,11 +159,31 @@ export default function EditProfileScreen() {
 
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-        {/* Avatar preview */}
+        {/* Avatar picker */}
         <View style={[s.avatarWrap, { backgroundColor: p.heroBg }]}>
-          <View style={[s.avatar, { backgroundColor: p.accent }]}>
-            <Text style={[s.avatarInitial, { color: p.accentText }]}>{initial}</Text>
-          </View>
+          <Pressable onPress={pickImage} style={s.avatarPressable}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={s.avatarImg} />
+            ) : (
+              <View style={[s.avatarFallback, { backgroundColor: p.accent }]}>
+                <Text style={[s.avatarInitial, { color: p.accentText }]}>{initial}</Text>
+              </View>
+            )}
+            {/* Camera badge */}
+            <View style={[s.cameraBadge, { backgroundColor: p.secondaryButton }]}>
+              <Ionicons name="camera" size={14} color="#ffffff" />
+            </View>
+          </Pressable>
+
+          <Text style={[s.avatarHint, { color: 'rgba(255,255,255,0.60)' }]}>Tap to change photo</Text>
+
+          {avatarUri && (
+            <Pressable onPress={removeAvatar} style={s.removeBtn}>
+              <Ionicons name="trash-outline" size={13} color="rgba(255,255,255,0.55)" />
+              <Text style={[s.removeBtnText, { color: 'rgba(255,255,255,0.55)' }]}>Remove</Text>
+            </Pressable>
+          )}
+
           <Text style={[s.avatarHandle, { color: 'rgba(255,255,255,0.65)' }]}>
             @{username.trim() || session?.username}
           </Text>
@@ -126,7 +192,6 @@ export default function EditProfileScreen() {
         {/* Fields */}
         <View style={[s.card, { backgroundColor: p.cardBg, borderColor: p.cardBorder }]}>
 
-          {/* Display name */}
           <View style={s.fieldBlock}>
             <Text style={[s.fieldLabel, { color: p.textSoft }]}>Display Name</Text>
             <View style={[s.inputRow, { borderColor: p.cardBorder, backgroundColor: p.stageBg }]}>
@@ -155,7 +220,6 @@ export default function EditProfileScreen() {
 
           <View style={[s.divider, { backgroundColor: p.cardBorder }]} />
 
-          {/* Username */}
           <View style={s.fieldBlock}>
             <Text style={[s.fieldLabel, { color: p.textSoft }]}>Username</Text>
             <View style={[s.inputRow, { borderColor: p.cardBorder, backgroundColor: p.stageBg }]}>
@@ -183,7 +247,6 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
-        {/* Feedback */}
         {!!error && (
           <View style={s.feedbackRow}>
             <Ionicons name="alert-circle-outline" size={14} color="#dc2626" />
@@ -212,10 +275,18 @@ const s = StyleSheet.create({
   saveBtn:     { paddingHorizontal: 12, paddingVertical: 8 },
   saveBtnText: { fontSize: 15, fontWeight: '800', fontFamily: Fonts.rounded },
   scroll:      { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
-  avatarWrap:  { borderRadius: 18, padding: 24, alignItems: 'center', gap: 8 },
-  avatar:      { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontSize: 30, fontWeight: '800', fontFamily: Fonts.rounded },
-  avatarHandle:  { fontSize: 13, fontWeight: '600', fontFamily: Fonts.mono },
+
+  avatarWrap:     { borderRadius: 18, padding: 24, alignItems: 'center', gap: 8 },
+  avatarPressable:{ position: 'relative' },
+  avatarImg:      { width: 80, height: 80, borderRadius: 40 },
+  avatarFallback: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial:  { fontSize: 32, fontWeight: '800', fontFamily: Fonts.rounded },
+  cameraBadge:    { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
+  avatarHint:     { fontSize: 12, fontFamily: Fonts.sans },
+  removeBtn:      { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  removeBtnText:  { fontSize: 12, fontFamily: Fonts.sans },
+  avatarHandle:   { fontSize: 13, fontWeight: '600', fontFamily: Fonts.mono, marginTop: 4 },
+
   card:        { borderRadius: 14, borderWidth: 1, paddingHorizontal: 14 },
   fieldBlock:  { paddingVertical: 12, gap: 8 },
   fieldLabel:  { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, fontFamily: Fonts.mono },
