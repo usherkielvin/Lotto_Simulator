@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -530,19 +530,35 @@ export default function HomeScreen() {
         {/* Admin Home */}
         {isAdmin ? (
           <>
-            <View style={[styles.heroCard, { backgroundColor: palette.heroBg, marginBottom: 20 }]}>
+            {/* ── Hero Banner ── */}
+            <View style={[styles.heroCard, { backgroundColor: palette.heroBg, marginBottom: 16 }]}>
               <View style={styles.heroTopRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.heroTag, { color: 'rgba(255,255,255,0.60)' }]}>LOTTO SIMULATOR</Text>
+                  <Text style={[styles.heroTag, { color: 'rgba(255,255,255,0.60)' }]}>PCSO LOTTO SIMULATOR</Text>
                   <Text style={[styles.heroTitle, { color: '#ffffff' }]}>Hi, {displayName}</Text>
                   <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.55)', marginTop: 4 }]}>
                     {now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
                   </Text>
                 </View>
-                <View style={[styles.demoBadge, { backgroundColor: 'rgba(244,180,0,0.18)' }]}>
-                  <Ionicons name="shield-checkmark-outline" size={12} color={palette.accent} />
-                  <Text style={[styles.demoBadgeText, { color: palette.accent }]}>Admin Dashboard</Text>
+                <View style={[styles.demoBadge, { backgroundColor: 'rgba(244,180,0,0.22)' }]}>
+                  <Ionicons name="shield-checkmark" size={12} color={palette.accent} />
+                  <Text style={[styles.demoBadgeText, { color: palette.accent }]}>Admin</Text>
                 </View>
+              </View>
+              <View style={[styles.heroDivider, { backgroundColor: 'rgba(255,255,255,0.10)' }]} />
+              {/* Quick stat pills */}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                {[
+                  { icon: 'layers-outline' as const, label: 'Games', value: String(games.length) },
+                  { icon: 'trophy-outline' as const, label: 'Major', value: String(majorGames.length) },
+                  { icon: 'dice-outline' as const, label: 'Digit', value: String(smallGames.length) },
+                ].map(item => (
+                  <View key={item.label} style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.10)', flex: 1 }]}>
+                    <Ionicons name={item.icon} size={14} color="rgba(255,255,255,0.55)" />
+                    <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.55)', marginTop: 6 }]}>{item.label}</Text>
+                    <Text style={[styles.heroStatValue, { color: '#ffffff' }]}>{item.value}</Text>
+                  </View>
+                ))}
               </View>
             </View>
 
@@ -550,36 +566,78 @@ export default function HomeScreen() {
               <ActivityIndicator color={palette.accent} style={{ marginTop: 40 }} />
             ) : (
               <>
-                {/* Major Lottos Section */}
+                {/* ── Major Lottos Results ── */}
                 <View style={[styles.heroSection, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
                   <View style={styles.heroHeader}>
-                    <View style={[styles.heroIcon, { backgroundColor: palette.accent + '20' }]}>
-                      <Ionicons name="trophy" size={20} color={palette.accent} />
+                    <View style={[styles.heroIcon, { backgroundColor: palette.accent + '22' }]}>
+                      <Ionicons name="trophy" size={18} color={palette.accent} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.heroTitleHero, { color: palette.textStrong }]}>Major Lottos</Text>
-                      <Text style={[styles.heroSubtitleHero, { color: palette.textSoft }]}>Game schedules and availability</Text>
-                    </View>
-                    <View style={[styles.heroBadgeHero, { backgroundColor: palette.chipIdle }]}>
-                      <Text style={[styles.heroBadgeTextHero, { color: palette.chipIdleText }]}>{majorGames.length}</Text>
+                      <Text style={[styles.heroSubtitleHero, { color: palette.textSoft }]}>Latest jackpot results</Text>
                     </View>
                   </View>
                   <View style={styles.heroContentHero}>
-                    {majorGames.map(g => {
+                    {majorGames.map((g, gi) => {
+                      const latest = g.results?.[0];
+                      const balls = latest?.numbers.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+                      const jackpot = latest?.jackpot ?? g.jackpot;
                       const available = isGameAvailableToday(g, now);
                       return (
-                        <View key={g.id} style={[styles.gameScheduleRow, { borderBottomColor: palette.cardBorder }]}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={[styles.gameScheduleName, { color: palette.textStrong }]}>{g.name}</Text>
-                            <Text style={[styles.gameScheduleTime, { color: palette.textSoft, fontSize: 11 }]}>
-                              {available ? g.drawTime : getNextDrawDate(g, now)}
-                            </Text>
+                        <View key={g.id} style={[
+                          styles.adminResultRow,
+                          gi > 0 && { borderTopWidth: 1, borderTopColor: palette.cardBorder },
+                        ]}>
+                          {/* Left: name + date + balls */}
+                          <View style={{ flex: 1, gap: 4 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={[styles.gameScheduleName, { color: palette.textStrong }]}>{g.name}</Text>
+                              <View style={[styles.gameScheduleBadge, { backgroundColor: available ? palette.chipActive : palette.chipIdle }]}>
+                                <Text style={[styles.gameScheduleBadgeText, { color: available ? palette.chipActiveText : palette.chipIdleText }]}>
+                                  {available ? 'TODAY' : 'OFF'}
+                                </Text>
+                              </View>
+                            </View>
+                            {latest ? (
+                              <Text style={[styles.gameScheduleTime, { color: palette.textSoft }]}>
+                                {latest.drawDateKey} · {latest.drawTime}
+                              </Text>
+                            ) : (
+                              <Text style={[styles.gameScheduleTime, { color: palette.textSoft }]}>No results yet</Text>
+                            )}
+                            {balls.length > 0 ? (
+                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 2 }}>
+                                {balls.map((n, i) => (
+                                  <View key={i} style={[styles.adminBall, { backgroundColor: palette.secondaryButton }]}>
+                                    <Text style={[styles.adminBallText, { color: palette.secondaryButtonText }]}>{n}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            ) : (
+                              <View style={[styles.adminNoBalls, { backgroundColor: palette.stageBg }]}>
+                                <Text style={[styles.gameScheduleTime, { color: palette.textSoft }]}>Awaiting draw</Text>
+                              </View>
+                            )}
                           </View>
-                          <View style={[styles.gameScheduleBadge, { backgroundColor: available ? palette.chipActive : palette.chipIdle }]}>
-                            <Ionicons name={available ? 'checkmark-circle' : 'time-outline'} size={12} color={available ? palette.chipActiveText : palette.chipIdleText} />
-                            <Text style={[styles.gameScheduleBadgeText, { color: available ? palette.chipActiveText : palette.chipIdleText }]}>
-                              {available ? 'LIVE TODAY' : 'OFF DAY'}
+                          {/* Right: jackpot + winners */}
+                          <View style={{ alignItems: 'flex-end', gap: 4, minWidth: 80 }}>
+                            <Text style={[styles.adminJackpot, { color: palette.accent }]}>
+                              {jackpot >= 1_000_000
+                                ? `₱${(jackpot / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+                                : new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(jackpot)}
                             </Text>
+                            {(latest?.winners ?? 0) > 0 ? (
+                              <View style={[styles.adminWinBadge, { backgroundColor: palette.payout + '22' }]}>
+                                <Ionicons name="trophy" size={9} color={palette.payout} />
+                                <Text style={[styles.adminWinText, { color: palette.payout }]}>
+                                  {latest!.winners} winner{latest!.winners !== 1 ? 's' : ''}
+                                </Text>
+                              </View>
+                            ) : (
+                              <Text style={[styles.gameScheduleTime, { color: palette.textSoft }]}>
+                                {g.jackpotStatus}
+                              </Text>
+                            )}
                           </View>
                         </View>
                       );
@@ -587,36 +645,62 @@ export default function HomeScreen() {
                   </View>
                 </View>
 
-                {/* Digit Games Section */}
+                {/* ── Digit Games Results ── */}
                 <View style={[styles.heroSection, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
                   <View style={styles.heroHeader}>
-                    <View style={[styles.heroIcon, { backgroundColor: palette.payout + '20' }]}>
-                      <Ionicons name="apps" size={20} color={palette.payout} />
+                    <View style={[styles.heroIcon, { backgroundColor: palette.payout + '22' }]}>
+                      <Ionicons name="dice" size={18} color={palette.payout} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.heroTitleHero, { color: palette.textStrong }]}>Digit Games</Text>
-                      <Text style={[styles.heroSubtitleHero, { color: palette.textSoft }]}>Daily 2D, 3D, 4D, and 6D draws</Text>
-                    </View>
-                    <View style={[styles.heroBadgeHero, { backgroundColor: palette.chipIdle }]}>
-                      <Text style={[styles.heroBadgeTextHero, { color: palette.chipIdleText }]}>{smallGames.length}</Text>
+                      <Text style={[styles.heroSubtitleHero, { color: palette.textSoft }]}>3D, 2D & more — latest draws</Text>
                     </View>
                   </View>
                   <View style={styles.heroContentHero}>
-                    {smallGames.map(g => {
-                      const available = isGameAvailableToday(g, now);
+                    {smallGames.map((g, gi) => {
+                      const drawTimes = g.drawTime.split(',').map(t => t.trim());
+                      const todayKey = toLocalDateKey(now);
                       return (
-                        <View key={g.id} style={[styles.gameScheduleRow, { borderBottomColor: palette.cardBorder }]}>
-                          <View style={{ flex: 1 }}>
+                        <View key={g.id} style={[
+                          styles.adminDigitGame,
+                          gi > 0 && { borderTopWidth: 1, borderTopColor: palette.cardBorder },
+                        ]}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                             <Text style={[styles.gameScheduleName, { color: palette.textStrong }]}>{g.name}</Text>
-                            <Text style={[styles.gameScheduleTime, { color: palette.textSoft, fontSize: 11 }]}>
-                              {available ? g.drawTime : getNextDrawDate(g, now)}
-                            </Text>
+                            <Text style={[styles.gameScheduleTime, { color: palette.textSoft }]}>{drawTimes.length}× daily</Text>
                           </View>
-                          <View style={[styles.gameScheduleBadge, { backgroundColor: available ? palette.chipActive : palette.chipIdle }]}>
-                            <Ionicons name={available ? 'checkmark-circle' : 'time-outline'} size={12} color={available ? palette.chipActiveText : palette.chipIdleText} />
-                            <Text style={[styles.gameScheduleBadgeText, { color: available ? palette.chipActiveText : palette.chipIdleText }]}>
-                              {available ? 'LIVE TODAY' : 'OFF DAY'}
-                            </Text>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            {drawTimes.map(time => {
+                              const result = (g.results ?? []).find(
+                                r => r.drawDateKey === todayKey && r.drawTime.toLowerCase() === time.toLowerCase()
+                              ) ?? g.results?.[0];
+                              const balls = result?.numbers.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+                              const isToday = result?.drawDateKey === todayKey;
+                              return (
+                                <View key={time} style={[styles.adminDigitSlot, { backgroundColor: palette.stageBg, flex: 1 }]}>
+                                  <Text style={[styles.adminDigitTime, { color: palette.textSoft }]}>{time}</Text>
+                                  {balls.length > 0 ? (
+                                    <View style={{ flexDirection: 'row', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+                                      {balls.map((n, i) => (
+                                        <View key={i} style={[styles.adminDigitBall, {
+                                          backgroundColor: isToday ? palette.payout + '33' : palette.chipIdle,
+                                          borderColor: isToday ? palette.payout + '66' : palette.cardBorder,
+                                        }]}>
+                                          <Text style={[styles.adminDigitBallText, { color: isToday ? palette.payout : palette.textSoft }]}>{n}</Text>
+                                        </View>
+                                      ))}
+                                    </View>
+                                  ) : (
+                                    <Text style={[styles.adminDigitTime, { color: palette.textSoft, fontSize: 16 }]}>—</Text>
+                                  )}
+                                  {result && (result.winners ?? 0) > 0 && (
+                                    <View style={[styles.adminWinBadge, { backgroundColor: palette.payout + '22', marginTop: 4 }]}>
+                                      <Text style={[styles.adminWinText, { color: palette.payout }]}>{result.winners}W</Text>
+                                    </View>
+                                  )}
+                                </View>
+                              );
+                            })}
                           </View>
                         </View>
                       );
@@ -976,7 +1060,7 @@ export default function HomeScreen() {
           ) /* end day-mode jackpot */
         )}
 
-        {/* Small Games Night Showcase — split: 4D/6D and daily 3D/2D */}
+        {/* Small Games Night Showcase */}
         {isBettingClosed && !gamesLoading && (() => {
           const todayKey = toLocalDateKey(now);
           const toHour = (t: string) => {
@@ -988,108 +1072,96 @@ export default function HomeScreen() {
             return h;
           };
 
-          const hasResult = (g: LottoGame) =>
-            isGameAvailableToday(g, now) && (g.results ?? []).some(r => r.drawDateKey === todayKey);
-
-          const bigDigit  = smallGames.filter(g => (g.id === '6digit' || g.id === '4digit') && hasResult(g));
-          const dailyDraw = smallGames.filter(g => (g.id === '3d-swertres' || g.id === '2d-ez2') && hasResult(g));
-
-          const renderGame = (g: LottoGame, gi: number, total: number) => {
-            const todayDraws = (g.results ?? [])
-              .filter(r => r.drawDateKey === todayKey)
-              .sort((a, b) => toHour(a.drawTime) - toHour(b.drawTime));
-            return (
-              <View key={g.id}
-                style={[
-                  { paddingVertical: 12 },
-                  gi > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.cardBorder },
-                ]}
-              >
-                <Text style={[styles.jackpotGameName, { color: palette.textStrong, fontSize: 13, marginBottom: 10 }]}>{g.name}</Text>
-                {todayDraws.map((r, di) => {
-                  const nums = r.numbers.split(',').map(s => parseInt(s.trim(), 10));
-                  const drawJackpot = r.jackpot ?? g.jackpot;
-                  return (
-                    <View key={`${r.drawDateKey}-${r.drawTime}`}
-                      style={[
-                        { paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-                        di > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.cardBorder },
-                      ]}
-                    >
-                      {/* Left: time pill + drawn balls */}
-                      <View style={{ flex: 1, gap: 6 }}>
-                        <View style={[styles.jackpotActivePill, { backgroundColor: palette.chipIdle, alignSelf: 'flex-start' }]}>
-                          <Text style={[styles.jackpotActivePillText, { color: palette.chipIdleText }]}>{r.drawTime}</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', gap: 5, flexWrap: 'wrap' }}>
-                          {nums.map((n, i) => (
-                            <View key={i} style={[styles.historyBall, { backgroundColor: palette.secondaryButton }]}>
-                              <Text style={[styles.historyBallText, { color: palette.secondaryButtonText }]}>{n}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-
-                      {/* Right: jackpot + status */}
-                      <View style={{ alignItems: 'flex-end', gap: 3 }}>
-                        <Text style={[styles.jackpotAmount, { color: palette.accent, fontSize: 16, marginBottom: 0 }]}>
-                          {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(drawJackpot)}
-                        </Text>
-                        {(r.winners ?? 0) > 0 ? (
-                          <View style={{ backgroundColor: palette.payout + '22', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
-                            <Text style={[styles.jackpotActivePillText, { color: palette.payout }]}>
-                              {r.winners} {r.winners === 1 ? 'Winner' : 'Winners'}
-                            </Text>
-                          </View>
-                        ) : (
-                          <Text style={[styles.jackpotActivePillText, { color: palette.textSoft }]}>Accumulating</Text>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            );
-          };
+          const visibleGames = smallGames.filter(g =>
+            isGameAvailableToday(g, now) && (g.results ?? []).some(r => r.drawDateKey === todayKey)
+          );
+          if (visibleGames.length === 0) return null;
 
           return (
-            <>
-              {/* 4D / 6D — scheduled draws */}
-              {bigDigit.length > 0 && (
-                <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
-                  <View style={styles.jackpotHeader}>
-                    <View>
-                      <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>4D / 6D Results</Text>
-                      <Text style={[styles.jackpotSubtitle, { color: palette.textSoft }]}>
-                        {now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
-                      </Text>
-                    </View>
-                    <View style={[styles.jackpotDrawBadge, { backgroundColor: palette.chipIdle }]}>
-                      <Ionicons name="grid-outline" size={11} color={palette.chipIdleText} />
-                      <Text style={[styles.jackpotDrawBadgeText, { color: palette.chipIdleText }]}>Drawn</Text>
-                    </View>
-                  </View>
-                  {bigDigit.map((g, gi) => renderGame(g, gi, bigDigit.length))}
+            <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
+              <View style={styles.jackpotHeader}>
+                <View>
+                  <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Digit Game Results</Text>
+                  <Text style={[styles.jackpotSubtitle, { color: palette.textSoft }]}>
+                    {now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </Text>
                 </View>
-              )}
+                <View style={[styles.jackpotDrawBadge, { backgroundColor: palette.chipIdle }]}>
+                  <Ionicons name="dice-outline" size={11} color={palette.chipIdleText} />
+                  <Text style={[styles.jackpotDrawBadgeText, { color: palette.chipIdleText }]}>Drawn</Text>
+                </View>
+              </View>
 
-              {/* 3D / 2D — daily multi-draw */}
-              {dailyDraw.length > 0 && (
-                <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
-                  <View style={styles.jackpotHeader}>
-                    <View>
-                      <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>3D / 2D Results</Text>
-                      <Text style={[styles.jackpotSubtitle, { color: palette.textSoft }]}>2PM · 5PM · 9PM draws</Text>
+              {visibleGames.map((g, gi) => {
+                const drawTimes = g.drawTime.split(',').map(t => t.trim()).sort((a, b) => toHour(a) - toHour(b));
+                const todayDraws = (g.results ?? []).filter(r => r.drawDateKey === todayKey);
+                return (
+                  <View key={g.id} style={[
+                    styles.sgGameBlock,
+                    gi > 0 && { borderTopWidth: 1, borderTopColor: palette.cardBorder },
+                  ]}>
+                    {/* Game name row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                      <View style={[styles.sgIconWrap, { backgroundColor: palette.payout + '22' }]}>
+                        <Ionicons name="dice-outline" size={16} color={palette.payout} />
+                      </View>
+                      <Text style={[styles.jackpotGameName, { color: palette.textStrong, fontSize: 15 }]}>{g.name}</Text>
+                      <Text style={[styles.jackpotSubtitle, { color: palette.textSoft }]}>{drawTimes.length}× daily</Text>
                     </View>
-                    <View style={[styles.jackpotDrawBadge, { backgroundColor: palette.chipIdle }]}>
-                      <Ionicons name="apps-outline" size={11} color={palette.chipIdleText} />
-                      <Text style={[styles.jackpotDrawBadgeText, { color: palette.chipIdleText }]}>Daily</Text>
+
+                    {/* Draw slots — one per row */}
+                    <View style={{ gap: 10 }}>
+                      {drawTimes.map(time => {
+                        const result = todayDraws.find(r => r.drawTime.toLowerCase() === time.toLowerCase());
+                        const balls = result?.numbers.split(',').map(s => s.trim()).filter(Boolean) ?? [];
+                        const jackpot = result?.jackpot ?? g.jackpot;
+                        return (
+                          <View key={time} style={[styles.sgSlot, { backgroundColor: palette.stageBg }]}>
+                            {/* Left: time pill + balls */}
+                            <View style={{ flex: 1, gap: 8 }}>
+                              <View style={[styles.sgTimePill, { backgroundColor: palette.chipIdle }]}>
+                                <Ionicons name="time-outline" size={11} color={palette.chipIdleText} />
+                                <Text style={[styles.sgSlotTime, { color: palette.chipIdleText }]}>{time}</Text>
+                              </View>
+                              {balls.length > 0 ? (
+                                <View style={styles.sgBallsWrap}>
+                                  {balls.map((n, i) => (
+                                    <View key={i} style={[styles.sgBall, { backgroundColor: palette.secondaryButton, borderColor: palette.secondaryButton }]}>
+                                      <Text style={[styles.sgBallText, { color: palette.secondaryButtonText }]}>{n}</Text>
+                                    </View>
+                                  ))}
+                                </View>
+                              ) : (
+                                <Text style={[styles.sgSlotTime, { color: palette.textSoft }]}>Awaiting draw</Text>
+                              )}
+                            </View>
+
+                            {/* Right: jackpot + winners — never shrink */}
+                            {balls.length > 0 && (
+                              <View style={styles.sgRightCol}>
+                                <Text style={[styles.sgJackpot, { color: palette.accent }]} numberOfLines={1}>
+                                  {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(jackpot)}
+                                </Text>
+                                {(result?.winners ?? 0) > 0 ? (
+                                  <View style={[styles.sgWinBadge, { backgroundColor: palette.payout + '22' }]}>
+                                    <Ionicons name="trophy" size={11} color={palette.payout} />
+                                    <Text style={[styles.sgWinText, { color: palette.payout }]}>
+                                      {result!.winners} {result!.winners === 1 ? 'Winner' : 'Winners'}
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  <Text style={[styles.sgWinText, { color: palette.textSoft }]}>No winner</Text>
+                                )}
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
                     </View>
                   </View>
-                  {dailyDraw.map((g, gi) => renderGame(g, gi, dailyDraw.length))}
-                </View>
-              )}
-            </>
+                );
+              })}
+            </View>
           );
         })()}
 
@@ -1483,14 +1555,14 @@ const styles = StyleSheet.create({
   dot:                  { height: 7, borderRadius: 4 },
   // Hero Sections
   heroSection:    { borderRadius: 20, borderWidth: 1, overflow: 'hidden', marginBottom: 20 },
-  heroHeader:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.1)' },
+  heroHeader:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
   heroIcon:       { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   heroTitleHero:  { fontSize: 16, fontWeight: '900', fontFamily: Fonts.rounded, textTransform: 'uppercase', letterSpacing: 0.5 },
   heroSubtitleHero: { fontSize: 11, fontWeight: '500', fontFamily: Fonts.sans, marginTop: 1 },
   heroBadgeHero:  { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   heroBadgeTextHero: { fontSize: 12, fontWeight: '800', fontFamily: Fonts.mono },
   heroContentHero: { paddingHorizontal: 14, paddingBottom: 14, paddingTop: 6 },
-  gameScheduleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.05)' },
+  gameScheduleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
   gameScheduleName: { fontSize: 14, fontWeight: '700', fontFamily: Fonts.sans },
   gameScheduleTime: { fontSize: 12, fontWeight: '600', fontFamily: Fonts.mono },
   gameScheduleBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
@@ -1502,5 +1574,34 @@ const styles = StyleSheet.create({
   historyBalls:    { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
   historyBall:     { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   historyBallText: { fontSize: 11, fontWeight: '800', fontFamily: Fonts.rounded },
+  // Admin result highlights
+  adminResultRow:  { paddingVertical: 14, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  adminBall:       { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  adminBallText:   { fontSize: 12, fontWeight: '900', fontFamily: Fonts.mono },
+  adminNoBalls:    { borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10, alignSelf: 'flex-start' },
+  adminJackpot:    { fontSize: 17, fontWeight: '900', fontFamily: Fonts.mono },
+  adminWinBadge:   { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  adminWinText:    { fontSize: 10, fontWeight: '800', fontFamily: Fonts.mono },
+  adminDigitGame:  { paddingVertical: 12 },
+  adminDigitSlot:  { borderRadius: 12, padding: 10, alignItems: 'center', gap: 6, minHeight: 80 },
+  adminDigitTime:  { fontSize: 10, fontWeight: '700', fontFamily: Fonts.mono, textTransform: 'uppercase' },
+  adminDigitBall:  { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  adminDigitBallText: { fontSize: 13, fontWeight: '900', fontFamily: Fonts.mono },
+  // Small game slot design (user home)
+  sgGameBlock:   { paddingVertical: 14 },
+  sgIconWrap:    { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  sgSlotsRow:    { flexDirection: 'row', gap: 8 },
+  sgSlot:        { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, gap: 12 },
+  sgTimePill:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
+  sgSlotTime:    { fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono },
+  sgBallsWrap:   { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  sgBall:        { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  sgBallText:    { fontSize: 14, fontWeight: '900', fontFamily: Fonts.mono },
+  sgRightCol:    { alignItems: 'flex-end', gap: 6, flexShrink: 0 },
+  sgJackpot:     { fontSize: 15, fontWeight: '900', fontFamily: Fonts.mono },
+  sgWinBadge:    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 },
+  sgWinText:     { fontSize: 12, fontWeight: '800', fontFamily: Fonts.mono },
+  categorySection: { marginTop: 8 },
+  categoryLabel:   { fontSize: 11, fontWeight: '700', fontFamily: Fonts.mono, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
 });
 
