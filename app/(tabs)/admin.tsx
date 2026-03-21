@@ -37,6 +37,19 @@ function formatJackpot(amount: number): string {
   }).format(amount);
 }
 
+/** Format a raw number string with commas as the user types: "45000000" → "45,000,000" */
+function formatJackpotInput(raw: string): string {
+  const digits = raw.replace(/[^0-9]/g, '');
+  if (!digits) return '';
+  return Number(digits).toLocaleString('en-US');
+}
+
+/** Strip commas back to plain integer string for saving */
+function stripJackpotInput(formatted: string): number | undefined {
+  const digits = formatted.replace(/[^0-9]/g, '');
+  return digits ? parseInt(digits, 10) : undefined;
+}
+
 type LottoGame = { id: string; name: string; drawTime: string; maxNumber: number };
 type OfficialResult = {
   id: number;
@@ -160,23 +173,18 @@ function ResultCard({
 }) {
   const p = palette;
   const balls = result.numbers.split(',').map(s => s.trim()).filter(Boolean);
+  const isDigit = ['2d-ez2', '3d-swertres', '4digit', '6digit'].includes(result.gameId);
   return (
     <View style={[rc.row, { borderColor: p.cardBorder }]}>
+      {/* Left: game info + balls */}
       <View style={{ flex: 1 }}>
-        <View style={rc.topRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[rc.game, { color: p.textStrong }]}>{gameName}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-              <Text style={[rc.date, { color: p.textSoft }]}>{formatDate(result.drawDateKey)}</Text>
-              <View style={[rc.badge, { backgroundColor: p.chipIdle }]}>
-                <Ionicons name="time-outline" size={10} color={p.chipIdleText} />
-                <Text style={[rc.badgeText, { color: p.chipIdleText }]}>{result.drawTime}</Text>
-              </View>
-            </View>
+        <Text style={[rc.game, { color: p.textStrong }]}>{gameName}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          <Text style={[rc.date, { color: p.textSoft }]}>{formatDate(result.drawDateKey)}</Text>
+          <View style={[rc.timeBadge, { backgroundColor: p.chipIdle }]}>
+            <Ionicons name="time-outline" size={10} color={p.chipIdleText} />
+            <Text style={[rc.badgeText, { color: p.chipIdleText }]}>{result.drawTime}</Text>
           </View>
-          {result.jackpot !== undefined && (
-            <Text style={[rc.jackpot, { color: p.accent }]}>{formatJackpot(result.jackpot)}</Text>
-          )}
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
           {balls.map((n, i) => (
@@ -186,27 +194,43 @@ function ResultCard({
           ))}
         </View>
       </View>
-      <View style={rc.actions}>
-        <Pressable onPress={onEdit} style={[rc.iconBtn, { backgroundColor: p.chipIdle }]}>
-          <Ionicons name="pencil-outline" size={14} color={p.chipIdleText} />
-        </Pressable>
-        <Pressable onPress={onDelete} style={[rc.iconBtn, { backgroundColor: p.chipIdle }]}>
-          <Ionicons name="trash-outline" size={14} color={p.warning} />
-        </Pressable>
+
+      {/* Right: jackpot badge + actions */}
+      <View style={rc.rightCol}>
+        {result.jackpot != null ? (
+          <View style={[rc.jackpotBadge, { 
+            backgroundColor: isDigit ? p.payout + '18' : p.accent + '18', 
+            borderColor: isDigit ? p.payout + '40' : p.accent + '40' 
+          }]}>
+            <Ionicons name={isDigit ? 'cash-outline' : 'trophy-outline'} size={10} color={isDigit ? p.payout : p.accent} />
+            <Text style={[rc.jackpotText, { color: isDigit ? p.payout : p.accent }]}>{formatJackpot(result.jackpot)}</Text>
+          </View>
+        ) : (
+          <View style={{ height: 22 }} />
+        )}
+        <View style={rc.actions}>
+          <Pressable onPress={onEdit} style={[rc.iconBtn, { backgroundColor: p.chipIdle }]}>
+            <Ionicons name="pencil-outline" size={14} color={p.chipIdleText} />
+          </Pressable>
+          <Pressable onPress={onDelete} style={[rc.iconBtn, { backgroundColor: p.chipIdle }]}>
+            <Ionicons name="trash-outline" size={14} color={p.warning} />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
 }
 const rc = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, gap: 8 },
-  topRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-  game:     { fontSize: 13, fontWeight: '700', fontFamily: Fonts.sans },
-  date:     { fontSize: 11, fontWeight: '500', fontFamily: Fonts.mono },
-  badge:    { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
-  badgeText:{ fontSize: 9, fontWeight: '700', fontFamily: Fonts.mono },
-  jackpot:  { fontSize: 14, fontWeight: '800', fontFamily: Fonts.mono },
-  actions:  { flexDirection: 'row', gap: 6 },
-  iconBtn:  { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  row:          { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingVertical: 12, borderTopWidth: 1, gap: 10 },
+  game:         { fontSize: 13, fontWeight: '700', fontFamily: Fonts.sans },
+  date:         { fontSize: 11, fontWeight: '500', fontFamily: Fonts.mono },
+  timeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
+  badgeText:    { fontSize: 9, fontWeight: '700', fontFamily: Fonts.mono },
+  rightCol:     { alignItems: 'flex-end', gap: 8 },
+  jackpotBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
+  jackpotText:  { fontSize: 11, fontWeight: '800', fontFamily: Fonts.mono },
+  actions:      { flexDirection: 'row', gap: 6 },
+  iconBtn:      { width: 30, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -233,6 +257,11 @@ export default function AdminScreen() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [showGamePicker, setShowGamePicker] = useState(false);
+
+  // Import modal
+  const [importVisible, setImportVisible] = useState(false);
+  const [manualData, setManualData] = useState('');
+  const [importing, setImporting] = useState(false);
 
 
 
@@ -294,7 +323,7 @@ export default function AdminScreen() {
     setDrawDate(new Date(r.drawDateKey + 'T12:00:00'));
     setDrawTime(r.drawTime ?? '9:00 PM');
     setNumbers(r.numbers);
-    setJackpotAmount(r.jackpot?.toString() ?? '');
+    setJackpotAmount(r.jackpot != null ? Number(r.jackpot).toLocaleString('en-US') : '');
     setMessage('');
     setShowGamePicker(false);
     setIsFormOpen(true);
@@ -316,7 +345,7 @@ export default function AdminScreen() {
           drawDateKey, 
           drawTime, 
           numbers: balls.join(','),
-          jackpot: jackpotAmount ? parseInt(jackpotAmount, 10) : undefined
+          jackpot: stripJackpotInput(jackpotAmount)
         },
       });
       setIsFormOpen(false);
@@ -341,6 +370,26 @@ export default function AdminScreen() {
         },
       },
     ]);
+  };
+
+  const handleImport = async () => {
+    if (!manualData.trim()) return;
+    setImporting(true);
+    try {
+      const data = await apiFetch<{ imported: number; skipped: number }>('/admin/import', {
+        method: 'POST',
+        userId: session!.userId,
+        body: { text: manualData },
+      });
+      setManualData('');
+      setImportVisible(false);
+      fetchResults();
+      Alert.alert('Import Complete', `Imported: ${data.imported}  Skipped: ${data.skipped}`);
+    } catch (e: unknown) {
+      Alert.alert('Import Failed', e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setImporting(false);
+    }
   };
 
   const gameName = (id: string) => games.find(g => g.id === id)?.name ?? id;
@@ -605,20 +654,25 @@ export default function AdminScreen() {
                 <Text style={[s.label, { color: p.textStrong }]}>Draw Jackpot (Optional)</Text>
                 <View style={[s.pickerBtn, { backgroundColor: p.stageBg, borderColor: p.cardBorder, marginTop: 8 }]}>
                   <TextInput
-                    style={{ flex: 1, color: p.textStrong, fontSize: 15, fontFamily: Fonts.sans }}
+                    style={{ flex: 1, color: p.textStrong, fontSize: 15, fontFamily: Fonts.mono }}
                     keyboardType="number-pad"
-                    placeholder="Enter jackpot for this specific draw"
+                    placeholder="0"
                     placeholderTextColor={p.textSoft}
                     value={jackpotAmount}
-                    onChangeText={setJackpotAmount}
+                    onChangeText={v => setJackpotAmount(formatJackpotInput(v))}
                     onFocus={() => {
                       setTimeout(() => {
                         formScrollRef.current?.scrollToEnd({ animated: true });
                       }, 100);
                     }}
                   />
-                  <Text style={{ color: p.textSoft, fontSize: 12, fontWeight: '700' }}>PHP</Text>
+                  <Text style={{ color: p.textSoft, fontSize: 12, fontWeight: '700', fontFamily: Fonts.mono }}>PHP</Text>
                 </View>
+                {jackpotAmount ? (
+                  <Text style={{ color: p.textSoft, fontSize: 11, fontFamily: Fonts.sans, marginTop: 4, marginLeft: 4 }}>
+                    {formatJackpot(stripJackpotInput(jackpotAmount) ?? 0)}
+                  </Text>
+                ) : null}
 
                 {message ? <Text style={[s.message, { color: p.warning }]}>{message}</Text> : null}
 

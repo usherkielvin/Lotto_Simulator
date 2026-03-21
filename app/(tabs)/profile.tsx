@@ -146,7 +146,7 @@ export default function ProfileScreen() {
   };
 
   const handleSignOut = async () => {
-    await apiFetch('/auth/logout', { method: 'POST' });
+    try { await apiFetch('/auth/logout', { method: 'POST', userId }); } catch { /* ignore */ }
     await signOut();
     router.replace('/' as never);
   };
