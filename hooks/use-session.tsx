@@ -44,7 +44,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await AsyncStorage.removeItem(KEY);
+    try {
+      // Clear session + all API cache + all app settings in one sweep
+      const allKeys = await AsyncStorage.getAllKeys();
+      const appKeys = allKeys.filter(
+        (k) => k === KEY || k.startsWith('api_cache:') || k.startsWith('lotto_settings_')
+      );
+      if (appKeys.length > 0) await AsyncStorage.multiRemove(appKeys);
+    } catch {
+      // Fallback: at minimum remove the session key
+      await AsyncStorage.removeItem(KEY).catch(() => {});
+    }
     setSession(null);
   }, []);
 

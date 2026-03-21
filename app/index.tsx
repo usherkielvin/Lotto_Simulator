@@ -1,5 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { useEffect, useRef, useState } from 'react';
 import {
     Animated,
@@ -14,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BIOMETRIC_LOCK_ENABLED_KEY } from '@/constants/settings';
 import { Fonts } from '@/constants/theme';
 import { apiFetch } from '@/hooks/use-api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -120,6 +124,48 @@ export default function LoginScreen() {
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+
+  const CREDS_KEY = 'lotto_saved_creds';
+
+  // Show biometric button only if: hardware available + enrolled + setting enabled + creds saved
+  useEffect(() => {
+    (async () => {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      const saved = await SecureStore.getItemAsync(CREDS_KEY);
+      const settingRaw = await AsyncStorage.getItem(BIOMETRIC_LOCK_ENABLED_KEY);
+      const settingOn = settingRaw === '1';
+      setBiometricAvailable(hasHardware && isEnrolled && !!saved && settingOn);
+    })();
+  }, []);
+
+  const triggerBiometric = async () => {
+    setBiometricLoading(true);
+    setError('');
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock Lotto Simulator',
+        fallbackLabel: 'Use Password',
+        cancelLabel: 'Cancel',
+      });
+      if (result.success) {
+        const raw = await SecureStore.getItemAsync(CREDS_KEY);
+        if (!raw) { setError('No saved credentials. Please log in manually.'); return; }
+        const { username: u, password: p } = JSON.parse(raw);
+        const session = await apiFetch<SessionResult>('/auth/login', {
+          method: 'POST',
+          body: { username: u, password: p },
+        });
+        enterHome(session);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Biometric auth failed.');
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
 
   const heroEntrance = useRef(new Animated.Value(0)).current;
   const cardEntrance = useRef(new Animated.Value(0)).current;
@@ -176,6 +222,8 @@ export default function LoginScreen() {
         method: 'POST',
         body: { username: cleanUsername, password: cleanPassword },
       });
+      // Save creds for biometric unlock on next open
+      await SecureStore.setItemAsync(CREDS_KEY, JSON.stringify({ username: cleanUsername, password: cleanPassword }));
       enterHome(session);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Login failed. Please try again.');
@@ -361,6 +409,18 @@ export default function LoginScreen() {
             <Ionicons name="arrow-forward" size={16} color={palette.buttonIcon} />
           </Pressable>
 
+          {!isSignup && biometricAvailable && (
+            <Pressable
+              style={[styles.biometricButton, { backgroundColor: palette.inputBg, borderColor: palette.inputBorder, opacity: biometricLoading ? 0.6 : 1 }]}
+              onPress={triggerBiometric}
+              disabled={biometricLoading}>
+              <Ionicons name="finger-print-outline" size={22} color={palette.secondaryButton} />
+              <Text style={[styles.biometricLabel, { color: palette.secondaryButton }]}>
+                {biometricLoading ? 'Verifying…' : 'Sign in with Face ID / Biometrics'}
+              </Text>
+            </Pressable>
+          )}
+
           <Pressable
             style={styles.toggleMode}
             onPress={() => {
@@ -406,4 +466,6 @@ const styles = StyleSheet.create({
   toggleMode:   { marginTop: 14, alignItems: 'center' },
   toggleModeText: { fontSize: 13, fontWeight: '500', fontFamily: Fonts.sans },
   toggleModeLink: { fontWeight: '700' },
+  biometricButton: { marginTop: 12, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 13 },
+  biometricLabel:  { fontSize: 14, fontWeight: '700', fontFamily: Fonts.sans },
 });

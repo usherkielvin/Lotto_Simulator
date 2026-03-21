@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
@@ -84,28 +84,41 @@ export default function WithdrawScreen() {
 
     if (val > balance) {
       setIsErr(true);
-      setMsg('Insufficient balance for this withdrawal.');
+      setMsg(`Insufficient balance. You only have ${formatPHP(balance)}.`);
       return;
     }
 
-    setBusy(true); setMsg(''); setIsErr(false);
-    try {
-      const res = await apiFetch<{ balance: number }>('/bets/balance', {
-        method: 'POST', userId, body: { type: 'withdraw', amount: val },
-      });
-      const updatedBalance = Number(res.balance);
-      setNewBal(updatedBalance);
-      setBalanceValue(updatedBalance);
-      refreshBalance().catch(() => {});
-      setAmount('');
-      setIsErr(false);
-      setMsg(`Successfully withdrawn ${formatPHP(val)}.`);
-    } catch (e: unknown) {
-      setIsErr(true);
-      setMsg(e instanceof Error ? e.message : 'Withdrawal failed.');
-    } finally {
-      setBusy(false);
-    }
+    Alert.alert(
+      'Confirm Withdrawal',
+      `Withdraw ${formatPHP(val)} from your demo balance?\n\nRemaining: ${formatPHP(balance - val)}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            setBusy(true); setMsg(''); setIsErr(false);
+            try {
+              const res = await apiFetch<{ balance: number }>('/bets/balance', {
+                method: 'POST', userId, body: { type: 'withdraw', amount: val },
+              });
+              const updatedBalance = Number(res.balance);
+              setNewBal(updatedBalance);
+              setBalanceValue(updatedBalance);
+              refreshBalance().catch(() => {});
+              setAmount('');
+              setIsErr(false);
+              setMsg(`Successfully withdrawn ${formatPHP(val)}.`);
+            } catch (e: unknown) {
+              setIsErr(true);
+              setMsg(e instanceof Error ? e.message : 'Withdrawal failed.');
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (

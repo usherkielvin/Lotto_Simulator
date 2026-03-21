@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Fonts } from '@/constants/theme';
@@ -69,24 +69,36 @@ export default function DepositScreen() {
 
     const val = parsed.value;
 
-    setBusy(true); setMsg(''); setIsErr(false);
-    try {
-      const res = await apiFetch<{ balance: number }>('/bets/balance', {
-        method: 'POST', userId, body: { type: 'deposit', amount: val },
-      });
-      const updatedBalance = Number(res.balance);
-      setNewBal(updatedBalance);
-      setBalanceValue(updatedBalance);
-      refreshBalance().catch(() => {});
-      setAmount('');
-      setIsErr(false);
-      setMsg(`Successfully deposited ${formatPHP(val)}.`);
-    } catch (e: unknown) {
-      setIsErr(true);
-      setMsg(e instanceof Error ? e.message : 'Deposit failed.');
-    } finally {
-      setBusy(false);
-    }
+    Alert.alert(
+      'Confirm Deposit',
+      `Add ${formatPHP(val)} to your demo balance?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Deposit',
+          onPress: async () => {
+            setBusy(true); setMsg(''); setIsErr(false);
+            try {
+              const res = await apiFetch<{ balance: number }>('/bets/balance', {
+                method: 'POST', userId, body: { type: 'deposit', amount: val },
+              });
+              const updatedBalance = Number(res.balance);
+              setNewBal(updatedBalance);
+              setBalanceValue(updatedBalance);
+              refreshBalance().catch(() => {});
+              setAmount('');
+              setIsErr(false);
+              setMsg(`Successfully deposited ${formatPHP(val)}.`);
+            } catch (e: unknown) {
+              setIsErr(true);
+              setMsg(e instanceof Error ? e.message : 'Deposit failed.');
+            } finally {
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (

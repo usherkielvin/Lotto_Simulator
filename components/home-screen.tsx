@@ -171,6 +171,13 @@ function formatCurrency(v: number) {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(v);
 }
 
+function shortGameName(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes('6-digit') || n.includes('6 digit') || n.includes('6digit')) return '6D Lotto';
+  if (n.includes('4-digit') || n.includes('4 digit') || n.includes('4digit')) return '4D Lotto';
+  return name;
+}
+
 function isGameAvailableToday(game: LottoGame, now: Date): boolean {
   if (!game.drawDays) return true;
   
@@ -235,7 +242,7 @@ export default function HomeScreen() {
   const [betMode, setBetMode] = useState<BetMode>('manual');
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [stake, setStake] = useState(MIN_STAKE_LOTTO);
-  const [notice, setNotice] = useState('Select a game and build your bet slip to continue.');
+  const [notice, setNotice] = useState('Pick a game below to build your ticket.');
   const [now, setNow] = useState(() => new Date());
   const [placingBet, setPlacingBet] = useState(false);
 
@@ -266,7 +273,7 @@ export default function HomeScreen() {
           ?? '';
         setSelectedGameId(initialId);
       })
-      .catch(() => setNotice('Could not load games. Is the server running?'))
+      .catch(() => setNotice('Could not load games. Check your connection.'))
       .finally(() => setGamesLoading(false));
   }, []);
 
@@ -421,7 +428,7 @@ export default function HomeScreen() {
       }
     }
     setSelectedNumbers(nums);
-    setNotice(`Lucky pick ready: ${nums.join(' - ')}`);
+    setNotice(`Lucky pick: ${nums.join(' · ')}`);
     triggerBoardPulse();
   };
 
@@ -465,11 +472,11 @@ export default function HomeScreen() {
   };
 
   const placeBet = async () => {
-    if (!selectedGame || !uid) { setNotice('Session error. Please log in again.'); return; }
+    if (!selectedGame || !uid) { setNotice('Session error — please log in again.'); return; }
 
     const drawCutoff = nextDrawAt;
     if (now.getTime() >= drawCutoff.getTime()) {
-      setNotice(`Betting is locked for this draw. Please wait for the next ${getNextDrawAt(new Date(now.getTime() + 60000), gameDrawTime).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })} round.`);
+      setNotice(`Draw locked. Next round opens at ${getNextDrawAt(new Date(now.getTime() + 60000), gameDrawTime).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })}.`);
       return;
     }
 
@@ -494,11 +501,11 @@ export default function HomeScreen() {
 
     if (activeNumbers.length !== requiredCount) {
       const label = requiredCount === 1 ? 'number' : 'numbers';
-      setNotice(`Select exactly ${requiredCount} ${label} before placing your bet.`);
+      setNotice(`Pick ${requiredCount} ${requiredCount === 1 ? 'number' : 'numbers'} to continue.`);
       return;
     }
     if (balance < stake) {
-      setNotice('Insufficient demo credits. Lower your stake or reset the app session.');
+      setNotice('Not enough credits. Lower your stake or top up.');
       return;
     }
 
@@ -510,7 +517,7 @@ export default function HomeScreen() {
         body: { gameId: selectedGame.id, numbers: activeNumbers, stake },
       });
       setBalance(cur => cur - stake);
-      setNotice(`Bet placed for ${selectedGame.name} on ${nextDrawDateKey} ${nextDrawAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })}. Stake: ${formatCurrency(stake)}.`);
+      setNotice(`Ticket placed — ${selectedGame.name} · ${nextDrawAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })} draw · ${formatCurrency(stake)}`);
       if (betMode === 'manual') setSelectedNumbers([]);
       else setSelectedNumbers(activeNumbers);
       triggerBoardPulse();
@@ -666,8 +673,7 @@ export default function HomeScreen() {
                           gi > 0 && { borderTopWidth: 1, borderTopColor: palette.cardBorder },
                         ]}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                            <Text style={[styles.gameScheduleName, { color: palette.textStrong }]}>{g.name}</Text>
-                            <Text style={[styles.gameScheduleTime, { color: palette.textSoft }]}>{drawTimes.length}× daily</Text>
+                            <Text style={[styles.gameScheduleName, { color: palette.textStrong }]}>{shortGameName(g.name)}</Text>
                           </View>
                           <View style={{ flexDirection: 'row', gap: 8 }}>
                             {drawTimes.map(time => {
@@ -741,26 +747,6 @@ export default function HomeScreen() {
                 : <Text style={[styles.heroStatValue, { color: palette.accent }]}>{formatCurrency(balance)}</Text>
               }
             </View>
-            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
-              <Ionicons name="timer-outline" size={14} color="rgba(255,255,255,0.55)" />
-              <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.55)', marginTop: 6 }]}>Next Draw</Text>
-              <Text style={[styles.heroStatValue, { color: '#ffffff' }]}>{countdownLabel}</Text>
-            </View>
-            <View style={[styles.heroStat, { backgroundColor: 'rgba(255,255,255,0.10)' }]}>
-              <Ionicons name="calendar-outline" size={14} color="rgba(255,255,255,0.55)" />
-              <Text style={[styles.heroStatLabel, { color: 'rgba(255,255,255,0.55)', marginTop: 6 }]}>Draw Date</Text>
-              <Text style={[styles.heroStatValue, { color: '#ffffff', fontSize: 12 }]}>
-                {nextDrawAt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
-              </Text>
-            </View>
-          </View>
-
-          {/* Draw lock note */}
-          <View style={styles.heroFootRow}>
-            <Ionicons name="lock-closed-outline" size={11} color="rgba(255,255,255,0.45)" />
-            <Text style={[styles.heroFootText, { color: 'rgba(255,255,255,0.45)' }]}>
-              Locks at {nextDrawAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })} · {nextDrawAt.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}
-            </Text>
           </View>
         </View>
 
@@ -1105,8 +1091,7 @@ export default function HomeScreen() {
                       <View style={[styles.sgIconWrap, { backgroundColor: palette.payout + '22' }]}>
                         <Ionicons name="dice-outline" size={16} color={palette.payout} />
                       </View>
-                      <Text style={[styles.jackpotGameName, { color: palette.textStrong, fontSize: 15 }]}>{g.name}</Text>
-                      <Text style={[styles.jackpotSubtitle, { color: palette.textSoft }]}>{drawTimes.length}× daily</Text>
+                      <Text style={[styles.jackpotGameName, { color: palette.textStrong, fontSize: 15 }]}>{shortGameName(g.name)}</Text>
                     </View>
 
                     {/* Draw slots — one per row */}
@@ -1167,18 +1152,18 @@ export default function HomeScreen() {
 
         {/* Game Picker + Bet Builder — hidden during maintenance window */}
         {isBettingClosed ? (
-          <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder, alignItems: 'center', paddingVertical: 28 }]}>
-            <Ionicons name="moon-outline" size={36} color={palette.textSoft} />
-            <Text style={[styles.sectionTitle, { color: palette.textStrong, marginTop: 12, textAlign: 'center' }]}>Betting Closed</Text>
+          <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder, alignItems: 'center', paddingVertical: 32 }]}>
+            <Ionicons name="moon-outline" size={32} color={palette.textSoft} />
+            <Text style={[styles.sectionTitle, { color: palette.textStrong, marginTop: 10, textAlign: 'center' }]}>Draw Window Closed</Text>
             <Text style={[styles.resultMeta, { color: palette.textSoft, textAlign: 'center', marginTop: 6 }]}>
-              Betting is unavailable from 9:00 PM to 7:00 AM.{'\n'}Come back after 7:00 AM to place your bets.
+              Tickets open daily from 7:00 AM to 9:00 PM.
             </Text>
           </View>
         ) : (
           <>
         {/* Game Picker */}
         <View style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder }]}>
-          <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Choose Lotto Game</Text>
+          <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Games</Text>
           {gamesLoading
             ? <ActivityIndicator color={palette.accent} style={{ marginTop: 12 }} />
             : (
@@ -1228,7 +1213,7 @@ export default function HomeScreen() {
 
         {/* Bet Builder */}
         <Animated.View ref={betBuilderRef} style={[styles.card, { backgroundColor: palette.cardBg, borderColor: palette.cardBorder, transform: [{ scale: boardPulse }] }]}>
-          <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Build Your Bet Slip</Text>
+          <Text style={[styles.sectionTitle, { color: palette.textStrong }]}>Your Ticket</Text>
 
           <View style={styles.modeRow}>
             {(['manual','lucky'] as const).map(mode => (
@@ -1457,7 +1442,7 @@ export default function HomeScreen() {
             onPress={placeBet} disabled={placingBet}>
             <Ionicons name="ticket-outline" size={16} color={palette.accentText} />
             <Text style={[styles.placeBetText, { color: palette.accentText }]}>
-              {placingBet ? 'Placing Bet…' : `Place Bet for ${nextDrawAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })} Draw`}
+              {placingBet ? 'Placing…' : `Buy Ticket · ${nextDrawAt.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true })}`}
             </Text>
           </Pressable>
 
