@@ -386,14 +386,14 @@ export default function HomeScreen() {
         orbOne: '#0e2d5d', orbTwo: '#123c73', stageBg: '#0a1b35', payout: '#84e4b7', warning: '#ffb670',
       }
     : {
-        screenBg: '#edf3ff', cardBg: '#ffffff', cardBorder: '#cadbf5', heroBg: '#0f4ea9',
-        heroText: '#ffffff', heroTextSoft: 'rgba(255,255,255,0.72)', heroStageBg: 'rgba(255,255,255,0.15)',
-        textStrong: '#15305e', textSoft: '#5a7299', accent: '#f4b400', accentText: '#342906',
-        secondaryButton: '#1260c4', secondaryButtonText: '#eff5ff',
-        chipIdle: '#e3edfd', chipIdleText: '#335d92', chipActive: '#f4b400', chipActiveText: '#332905',
-        numberIdle: '#d6e5ff', numberIdleText: '#1e3a6b', numberSelected: '#f4b400', numberSelectedText: '#342906',
-        ticketPending: '#dbeafe', ticketWon: '#d5f5e7', ticketLost: '#ffe1e4',
-        orbOne: '#cadffd', orbTwo: '#dde9ff', stageBg: '#f2f7ff', payout: '#0f7a4f', warning: '#a86000',
+        screenBg: '#e8f0fe', cardBg: '#ffffff', cardBorder: '#b8cef0', heroBg: '#0d47a1',
+        heroText: '#ffffff', heroTextSoft: 'rgba(255,255,255,0.80)', heroStageBg: 'rgba(255,255,255,0.18)',
+        textStrong: '#0d1f3c', textSoft: '#3a5a8a', accent: '#e6a800', accentText: '#2e2200',
+        secondaryButton: '#1251a8', secondaryButtonText: '#e8f0fe',
+        chipIdle: '#d0e2fb', chipIdleText: '#1a3d6e', chipActive: '#e6a800', chipActiveText: '#2e2200',
+        numberIdle: '#c2d8f8', numberIdleText: '#0d2a5c', numberSelected: '#e6a800', numberSelectedText: '#2e2200',
+        ticketPending: '#d0e2fb', ticketWon: '#c6f0dc', ticketLost: '#ffd6d9',
+        orbOne: '#b8d0f8', orbTwo: '#ccdcfc', stageBg: '#edf4ff', payout: '#0a6640', warning: '#8f4f00',
       };
 
   const triggerBoardPulse = () => {
@@ -778,10 +778,9 @@ export default function HomeScreen() {
                         {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(g.jackpot)}
                       </Text>
                       {(latest?.winners ?? 0) > 0 ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                          <Ionicons name="trophy" size={12} color={palette.accent} />
-                          <Text style={[styles.jackpotStatus, { color: palette.accent, marginBottom: 0 }]}>
-                            {latest!.winners} {latest!.winners === 1 ? 'winner' : 'winners'}
+                        <View style={{ backgroundColor: palette.payout + '22', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginTop: 4, alignSelf: 'flex-start' }}>
+                          <Text style={[styles.jackpotStatus, { color: palette.payout, marginBottom: 0 }]}>
+                            {latest!.winners} {latest!.winners === 1 ? 'Winner' : 'Winners'}
                           </Text>
                         </View>
                       ) : (
@@ -916,10 +915,9 @@ export default function HomeScreen() {
                       const latestResult = g.results?.[0];
                       const w = latestResult?.winners ?? 0;
                       return w > 0 ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 14 }}>
-                          <Ionicons name="trophy" size={12} color={palette.accent} />
-                          <Text style={[styles.jackpotStatus, { color: palette.accent, marginBottom: 0 }]}>
-                            {w} {w === 1 ? 'winner' : 'winners'}
+                        <View style={{ backgroundColor: palette.payout + '22', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginBottom: 14, alignSelf: 'flex-start' }}>
+                          <Text style={[styles.jackpotStatus, { color: palette.payout, marginBottom: 0 }]}>
+                            {w} {w === 1 ? 'Winner' : 'Winners'}
                           </Text>
                         </View>
                       ) : (
@@ -1038,10 +1036,9 @@ export default function HomeScreen() {
                           {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(drawJackpot)}
                         </Text>
                         {(r.winners ?? 0) > 0 ? (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                            <Ionicons name="trophy" size={10} color={palette.accent} />
-                            <Text style={[styles.jackpotActivePillText, { color: palette.accent }]}>
-                              {r.winners} {r.winners === 1 ? 'winner' : 'winners'}
+                          <View style={{ backgroundColor: palette.payout + '22', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                            <Text style={[styles.jackpotActivePillText, { color: palette.payout }]}>
+                              {r.winners} {r.winners === 1 ? 'Winner' : 'Winners'}
                             </Text>
                           </View>
                         ) : (
